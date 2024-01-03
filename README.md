@@ -51,13 +51,13 @@ You can use SlackAttack! with various command-line arguments to perform specific
 Use the `--check-permissions` argument to list permissions and return commands you can run:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --check-permissions`
+python3 slackattack.py --token YOUR_TOKEN --check-permissions
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --check-permissions`
+python3 slackattack.py --cookie 'YOUR_COOKIE' --check-permissions
 ```
 
 ### Get Channel List
@@ -65,13 +65,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --check-permissions`
 Retrieve a list of channels in your Slack workspace:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-channels`
+python3 slackattack.py --token YOUR_TOKEN --list-channels
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --list-channels`
+python3 slackattack.py --cookie 'YOUR_COOKIE' --list-channels
 ```
 
 ### Get File URLs
@@ -79,13 +79,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --list-channels`
 Retrieve file URLs for a specific channel using the `--channel` argument:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID`
+python3 slackattack.py --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --list-file-urls --channel CHANNEL_ID`
+python3 slackattack.py --cookie 'YOUR_COOKIE' --list-file-urls --channel CHANNEL_ID
 ```
 
 ### Download Files
@@ -93,13 +93,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --list-file-urls --channel CHANNEL
 Download files from Slack channels:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --download-files`
+python3 slackattack.py --token YOUR_TOKEN --download-files
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --download-files`
+python3 slackattack.py --cookie 'YOUR_COOKIE' --download-files
 ```
 
 ### Get User List
@@ -107,13 +107,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --download-files`
 Retrieve a list of users in your Slack workspace:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-users`
+python3 slackattack.py --token YOUR_TOKEN --list-users
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --list-users`
+python3 slackattack.py --cookie 'YOUR_COOKIE' --list-users
 ```
 
 Replace `YOUR_TOKEN`, `YOUR_COOKIE`, and other placeholders with your actual Slack API token, cookie, and channel ID when running the commands.
