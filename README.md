@@ -21,21 +21,18 @@ To use SlackAttack!, follow these installation steps:
 1. Clone this repository to your local machine using Git:
   
 ```  
-shell
 git clone https://github.com/fr4nk3nst1ner/slackattack.git
 ```
     
 2. Change your working directory to the project folder:
   
 ```  
-shell
 cd slackattack
 ```
     
 3. Install the required Python packages using pip:
   
 ```  
-shell
 pip3 install -r requirements.txt
 ```
     
@@ -54,14 +51,12 @@ You can use SlackAttack! with various command-line arguments to perform specific
 Use the `--check-permissions` argument to list permissions and return commands you can run:
 
 ```
-shell
 python3 slackattack.py --token YOUR_TOKEN --check-permissions`
 ```
 
 or
 
 ```
-shell
 python3 slackattack.py --cookie 'YOUR_COOKIE' --check-permissions`
 ```
 
@@ -70,14 +65,12 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --check-permissions`
 Retrieve a list of channels in your Slack workspace:
 
 ```
-shell
 python3 slackattack.py --token YOUR_TOKEN --list-channels`
 ```
 
 or
 
 ```
-shell
 python3 slackattack.py --cookie 'YOUR_COOKIE' --list-channels`
 ```
 
@@ -86,14 +79,12 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --list-channels`
 Retrieve file URLs for a specific channel using the `--channel` argument:
 
 ```
-shell
 python3 slackattack.py --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID`
 ```
 
 or
 
 ```
-shell
 python3 slackattack.py --cookie 'YOUR_COOKIE' --list-file-urls --channel CHANNEL_ID`
 ```
 
@@ -102,14 +93,12 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --list-file-urls --channel CHANNEL
 Download files from Slack channels:
 
 ```
-shell
 python3 slackattack.py --token YOUR_TOKEN --download-files`
 ```
 
 or
 
 ```
-shell
 python3 slackattack.py --cookie 'YOUR_COOKIE' --download-files`
 ```
 
@@ -118,14 +107,12 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --download-files`
 Retrieve a list of users in your Slack workspace:
 
 ```
-shell
 python3 slackattack.py --token YOUR_TOKEN --list-users`
 ```
 
 or
 
 ```
-shell
 python3 slackattack.py --cookie 'YOUR_COOKIE' --list-users`
 ```
 
