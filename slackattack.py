@@ -6,10 +6,75 @@ import hashlib
 import re
 import uuid
 import urllib3
+import sys
+sys.path.append('./detect-secrets')  # Adjust the path as needed
+from detect_secrets.core.secrets_collection import SecretsCollection
+from detect_secrets.settings import transient_settings
+import json
 
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+ALREADY_SIGNED_IN_TEAM_REGEX = r"([a-zA-Z0-9\-]+\.slack\.com)"
+SLACK_API_TOKEN_REGEX = r"(xox[a-zA-Z]-[a-zA-Z0-9-]+)"
+WORKSPACE_VALID_EMAILS_REGEX = r"email-domains-formatted=\"(@.+?)[\"]"
+PRIVATE_KEYS_REGEX = r"([-]+BEGIN [^\s]+ PRIVATE KEY[-]+[\s]*[^-]*[-]+END [^\s]+ PRIVATE KEY[-]+)"
+S3_REGEX = r"(" \
+           r"[a-zA-Z0-9-\.\_]+\.s3\.amazonaws\.com" \
+           r"|s3://[a-zA-Z0-9-\.\_]+" \
+           r"|s3-[a-zA-Z0-9-\.\_\/]+" \
+           r"|s3.amazonaws.com/[a-zA-Z0-9-\.\_]+" \
+           r"|s3.console.aws.amazon.com/s3/buckets/[a-zA-Z0-9-\.\_]+)"
+
+CREDENTIALS_REGEX = r"(?i)(" \
+                    r"password\s*[`=:\"]+\s*[^\s]+|" \
+                    r"password is\s*[`=:\"]*\s*[^\s]+|" \
+                    r"pwd\s*[`=:\"]*\s*[^\s]+|" \
+                    r"passwd\s*[`=:\"]+\s*[^\s]+)"
+
+AWS_KEYS_REGEX = r"(?!com/archives/[A-Z0-9]{9}/p[0-9]{16})" \
+                 r"((?<![A-Za-z0-9/+])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+])|(?<![A-Z0-9])[A-Z0-9]{20}(?![A-Z0-9]))"
+S3_QUERIES = ["s3.amazonaws.com", "s3://", "https://s3", "http://s3"]
+CREDENTIALS_QUERIES = ["password:", "password is", "pwd", "passwd"]
+AWS_KEYS_QUERIES = ["ASIA*", "AKIA*"]
+PRIVATE_KEYS_QUERIES = ["BEGIN DSA PRIVATE",
+                        "BEGIN EC PRIVATE",
+                        "BEGIN OPENSSH PRIVATE",
+                        "BEGIN PGP PRIVATE",
+                        "BEGIN RSA PRIVATE"]
+INTERESTING_FILE_QUERIES = [".config",
+                            ".doc",
+                            ".docx",
+                            "id_rsa",
+                            ".key",
+                            ".p12",
+                            ".pem",
+                            ".pfx",
+                            ".pkcs12",
+                            ".ppk",
+                            ".sh",
+                            ".sql",
+                            "backup",
+                            "password",
+                            "id_rsa",
+                            "pasted image",
+                            "secret"]
+LINKS_QUERIES = ["amazonaws",
+                 "atlassian",
+                 "beta",
+                 "confluence",
+                 "docs.google.com",
+                 "github",
+                 "internal",
+                 "jenkins",
+                 "jira",
+                 "kubernetes",
+                 "sharepoint",
+                 "staging",
+                 "swagger",
+                 "travis",
+                 "trello"]
 
 def make_cookie_request(workspace_url, user_cookie, proxy=None, verify_ssl=False):
     try:
@@ -400,6 +465,93 @@ def unix_timestamp_to_human_readable(epoch_time):
         return "N/A"
 
 
+
+
+
+
+
+
+
+
+
+
+def pillage_conversations(credentials, proxy, verify_ssl=False):
+    all_conversations = list_channels(credentials, proxy=proxy, verify_ssl=verify_ssl)
+
+    secrets_collection = SecretsCollection()
+
+    for conversation in all_conversations:
+        conversation_id = conversation['id']
+        conversation_name = conversation.get('name', 'N/A')
+        messages = retrieve_conversation_messages(credentials, conversation_id, proxy=proxy, verify_ssl=verify_ssl)
+
+        for message in messages:
+            text = message.get('text', '')
+            find_secrets_in_text(text, secrets_collection)
+
+
+
+def retrieve_conversation_messages(credentials, conversation_id, proxy, verify_ssl=False):
+    if 'token' in credentials:
+        test_url = f"https://slack.com/api/conversations.history?channel={conversation_id}"
+        payload = None  # No payload for token-based authentication
+
+        response = make_slack_request(test_url, credentials, method="GET", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
+
+    elif 'cookie' in credentials:
+        user_session_token = make_cookie_request(credentials['workspace_url'], credentials['cookie'], proxy, verify_ssl)
+        if not user_session_token:
+            print("[ERROR]: Unable to obtain user session token.")
+            return []
+
+        test_url = f"https://slack.com/api/conversations.history?channel={conversation_id}"
+        payload = {"token": user_session_token}
+        response = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
+
+    if response and response.get("ok"):
+        return response.get("messages", [])
+    else:
+        print(f"Error retrieving messages for conversation {conversation_id}")
+        return []
+
+
+
+
+def find_secrets_in_text(text, secrets_collection):
+    # Add the entire text as a potential secret with type 'Token'
+    secrets_collection.add_line("filename", text, "Token")
+
+    # Print the original text before scanning
+    print(f"Original text: {text}")
+
+    # Run the scan operation on the provided text
+    secrets_collection.scan()
+
+    # Ensure that secrets_collection.json() returns a list of dictionaries
+    secrets = secrets_collection.json()
+
+    if secrets:
+        print(f"Potential secrets found in message: {text}")
+        for secret in secrets:
+            if isinstance(secret, dict):
+                if 'type' in secret and 'filename' in secret and 'is_verified' in secret:
+                    print(f"Type: {secret['type']}, Filename: {secret['filename']}, Is Verified: {secret['is_verified']}")
+                elif 'Unexpected secret format: filename' not in str(secret):
+                    # Skip the output when encountering the specific message
+                    print(f"Unexpected secret format: {secret}")
+            else:
+                print(f"Unexpected secret format: {secret}")
+
+
+
+
+
+
+
+
+
+
+
 def main():
     parser = argparse.ArgumentParser(description="Download files from Slack channels")
     group = parser.add_mutually_exclusive_group(required=True)
@@ -407,6 +559,8 @@ def main():
     group.add_argument("--cookie", type=str, help="User-supplied cookie")
     group.add_argument("--user-cookie", type=str, help="User session cookie (e.g., xoxd-...)")
     parser.add_argument("--workspace-url", type=str, help="Workspace URL for authenticating user session token")
+    
+    parser.add_argument("--pillage", action='store_true', help="Search conversations for secrets")
 
     parser.add_argument("--test", action='store_true', help="Test Slack credentials")
     parser.add_argument("--list-file-urls", action='store_true', help="Get file URLs")
@@ -423,6 +577,9 @@ def main():
     args = parser.parse_args()
 
     args = parser.parse_args()
+
+    secrets_collection = SecretsCollection()
+
 
     credentials = {}
     if args.token:
@@ -524,6 +681,8 @@ def main():
     elif args.dump_logs:
         dump_logs(credentials, proxy)
 
+    if args.pillage:
+        pillage_conversations(credentials, proxy=proxy)
 
 
 if __name__ == "__main__":

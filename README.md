@@ -45,6 +45,9 @@ You can use SlackAttack! with various command-line arguments to perform specific
     
 - **Cookie**: You can alternatively use a "xoxd-*" cookie for authentication. It will automate the processes involved to retrieve the "xoxc-*" session cookie to interact with the API. Replace `YOUR_COOKIE` with your actual cookie.
     
+### Want to quickly get the l00t and move on? 
+
+Use the `--pillage` argument to scan conversations for secrets
 
 ### Check the permissions and what you can do with your token or cookie
 
