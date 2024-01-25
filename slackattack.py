@@ -573,6 +573,9 @@ def save_output_to_json(data, filename):
     
 
 def main():
+
+    output_data = {}
+           
     parser = argparse.ArgumentParser(description="Download files from Slack channels")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--token", type=str, help="Slack API token")
