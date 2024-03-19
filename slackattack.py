@@ -576,7 +576,7 @@ def main():
 
     output_data = {}
            
-    parser = argparse.ArgumentParser(description="Download files from Slack channels")
+    parser = argparse.ArgumentParser(description="Post-Ex tool for Slack bot and user tokens.")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--token", type=str, help="Slack API token")
     group.add_argument("--cookie", type=str, help="User-supplied cookie")
