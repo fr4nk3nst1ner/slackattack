@@ -2,4 +2,4 @@ venv/
 slackattack.egg-info/
 dist/
 build/
-__pycache__
+__pycache__/
