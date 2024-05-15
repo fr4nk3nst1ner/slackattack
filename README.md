@@ -15,6 +15,8 @@ SlackAttack! can perform various enumeration tasks, such as dumping channel info
 - **Get User List**: Retrieve a list of users in your Slack workspace.
 - **Pillage conversations**: Leverages detect-secrets libraries to automatically find secrets in files and conversations. 
 
+![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/banner.png)
+
 ## Installation
 
 To use SlackAttack!, follow these installation steps:
@@ -55,6 +57,10 @@ Use the `--pillage` argument to scan conversations for secrets
 ```
 python3 slackattack.py --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com --pillage
 ```
+
+
+![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/slack_token_demo.gif)
+
 
 
 ### Check the permissions and what you can do with your token or cookie
@@ -113,6 +119,9 @@ or
 python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --download-files
 ```
 
+![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/slack_cookie_demo.gif)
+
+
 ### Get User List
 
 Retrieve a list of users in your Slack workspace:
@@ -138,6 +147,16 @@ Happy Slack hacking!
 ## Shoutouts
 
 Props to the author of [Slack Pirate](https://github.com/emtunc/SlackPirate). While there may be other tools out there that have solved this problem, Slack Pirate was my main source of inspiration when creating this tool beyond just the one-off proof of concept that solved my unique need.
+
+## Quick Note on "d" Cookies 
+
+The "d" cookie can be used to interact with the Slack API. This d cookie is used to get a user session token. Normally this all happens on the backend without the user knowing it. However, there area series of steps we must take in order to convert that d cookie in to a xoxc-* user session token. 
+
+This is handled by you automatically when you pass the --cookie [d cookie value here]. When you pass the cookie, it should be passed in the same "smart" encoded (special characters only encoded) format as if it were being passed through the browser. If you need an example of this, just log in to Slack and grab your d cookie value from the browser developer tools or Burp. 
+
+![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/dtoken.png)
+
+For more information on this, see [this](https://papermtn.co.uk/retrieving-and-using-slack-cookies-for-authentication/) article. 
 
 ## To Do
 

@@ -362,8 +362,10 @@ def check_permissions(credentials, use_proxy=False, proxy_url=None, verify_ssl=F
         available_flags = []
 
         if files_list_permission:
-            available_flags.append("--list-file-urls")
+            #available_flags.append("--list-file-urls")
             available_flags.append("--list-files")
+            available_flags.append("--download-files")
+
 
         if users_list_permission:
             available_flags.append("--list-users")
@@ -403,7 +405,7 @@ def check_permissions(credentials, use_proxy=False, proxy_url=None, verify_ssl=F
         available_flags = []
 
         if files_list_permission:
-            available_flags.append("--list-file-urls")
+            #available_flags.append("--list-file-urls")
             available_flags.append("--list-files")
 
         if users_list_permission:
@@ -438,7 +440,7 @@ def check_dump_logs_permission(credentials, proxy=None, verify_ssl=False):
         response = make_slack_request(url, credentials, method="GET", proxy=proxy, verify_ssl=verify_ssl)
 
     else:
-        print("[ERROR]: Invalid credentials provided.")
+        #print("[ERROR]: Invalid credentials provided.")
         return False
 
     if isinstance(response, dict) and response.get("ok") is True:
