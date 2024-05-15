@@ -151,7 +151,7 @@ The "d" cookie can be used to interact with the Slack API. This d cookie is used
 
 This is handled by you automatically when you pass the --cookie [d cookie value here]. When you pass the cookie, it should be passed in the same "smart" encoded (special characters only encoded) format as if it were being passed through the browser. If you need an example of this, just log in to Slack and grab your d cookie value from the browser developer tools or Burp. 
 
-![Alt Text](https://github.com/fr4nk3nst1ner//blob/main/images/dtoken.png)
+![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/dtoken.png)
 
 For more information on this, see [this](https://papermtn.co.uk/retrieving-and-using-slack-cookies-for-authentication/) article. 
 
