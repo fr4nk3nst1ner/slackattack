@@ -8,6 +8,7 @@ import uuid
 import urllib3
 from termcolor import colored   
 import json 
+from banner import get_main_banner, get_sub_banner
 
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -603,12 +604,13 @@ def save_output_to_json(data, filename):
     with open(filename, 'w') as json_file:
         json.dump(data, json_file, indent=2)
     
+class CustomHelpFormatter(argparse.HelpFormatter):
+    def format_help(self):
+        return get_main_banner() + super().format_help()
 
 def main():
-
     output_data = {}
-           
-    parser = argparse.ArgumentParser(description="Post-Ex tool for Slack bot and user tokens.")
+    parser = argparse.ArgumentParser(description="Post-Ex tool for Slack bot and user tokens.", formatter_class=CustomHelpFormatter)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--token", type=str, help="Slack API token")
     group.add_argument("--cookie", type=str, help="User-supplied cookie")
@@ -619,7 +621,6 @@ def main():
     parser.add_argument("--output-json", "-o", type=str, help="Save output in JSON format to the specified file")
 
     parser.add_argument("--test", action='store_true', help="Test Slack credentials")
-    #parser.add_argument("--list-file-urls", action='store_true', help="Get file URLs")
     parser.add_argument("--download-files", action='store_true', help="Download files")
     parser.add_argument("--output-directory", type=str, help="Output directory for downloaded files")
     parser.add_argument("--list-users", action='store_true', help="Get list of users")
@@ -628,9 +629,7 @@ def main():
     parser.add_argument("--list-files", action='store_true', help="List all files from all channels")
     parser.add_argument("--dump-logs", action='store_true', help="Dump team access logs")
     parser.add_argument("--verbose", "-v", action='store_true', help="Enable verbose logging for troubleshooting")
-    parser.add_argument("--proxy", "-p", type=str, help="Specify a proxy (e.g., 127.0.0.1:8080)")
-
-    args = parser.parse_args()
+    parser.add_argument("--proxy", "-p", type=str, help="Specify a proxy (e.g., http://127.0.0.1:8080)")
 
     args = parser.parse_args()
 

@@ -1,1 +1,4 @@
 venv/
+slackattack.egg-info/
+dist/
+build/
