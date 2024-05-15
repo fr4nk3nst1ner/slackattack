@@ -1,13 +1,13 @@
 
-# SlackAttack!
+# Slackattack
 
 ## Background
 
-SlackAttack! is a Python script designed to interact with Slack's API using a Slack token or cookie that you may obtain during an engagement. It supports Slack's new API authentication model, allowing you to demonstrate the risks associated with plaintext Slack bot tokens and achieve your objectives!
+Slackattack is a Python script designed to interact with Slack's API using a Slack token or cookie that you may obtain during an engagement. It supports Slack's new API authentication model, allowing you to demonstrate the risks associated with plaintext Slack bot tokens and achieve your objectives!
 
 ## Description
 
-SlackAttack! can perform various enumeration tasks, such as dumping channel information, downloading files, and enumerating users. It offers the following capabilities:
+Slackattack can perform various enumeration tasks, such as dumping channel information, downloading files, and enumerating users. It offers the following capabilities:
 
 - **Get Channel List**: Retrieve a list of channels in your Slack workspace.
 - **Get File URLs**: Obtain a list of file URLs within specific Slack channels.
@@ -19,7 +19,7 @@ SlackAttack! can perform various enumeration tasks, such as dumping channel info
 
 ## Installation
 
-To use SlackAttack!, follow these installation steps:
+To use Slackattack, follow these installation steps:
 
 1. Clone this repository to your local machine using Git:
   
@@ -44,7 +44,7 @@ pip3 install -r requirements.txt
 
 ![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/slack_token_demo.gif)
 
-You can use SlackAttack! with various command-line arguments to perform specific actions. Here's how to use each argument:
+You can use Slackattack with various command-line arguments to perform specific actions. Here's how to use each argument:
 
 - **Token**: You need to provide your Slack API token as an argument for authentication. Replace `YOUR_TOKEN` with your actual token.
     
@@ -57,7 +57,7 @@ You can use SlackAttack! with various command-line arguments to perform specific
 Use the `--pillage` argument to scan conversations for secrets
 
 ```
-python3 slackattack.py --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com --pillage
+python3 .py --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com --pillage
 ```
 
 ### Check the permissions and what you can do with your token or cookie
@@ -65,13 +65,13 @@ python3 slackattack.py --cookie YOUR_COOKIE --workspace-url https://[workspace].
 Use the `--check-permissions` argument to list permissions and return commands you can run:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --check-permissions
+python3 .py --token YOUR_TOKEN --check-permissions
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --check-permissions
+python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --check-permissions
 ```
 
 ### Get Channel List
@@ -79,13 +79,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace
 Retrieve a list of channels in your Slack workspace:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-channels
+python3 .py --token YOUR_TOKEN --list-channels
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-channels
+python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-channels
 ```
 
 ### Get File URLs
@@ -93,13 +93,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace
 Retrieve file URLs for a specific channel using the `--channel` argument:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID
+python3 .py --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-file-urls --channel CHANNEL_ID
+python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-file-urls --channel CHANNEL_ID
 ```
 
 ### Download Files
@@ -107,16 +107,16 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace
 Download files from Slack channels:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --download-files
+python3 .py --token YOUR_TOKEN --download-files
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --download-files
+python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --download-files
 ```
 
-![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/slack_cookie_demo.gif)
+![Alt Text](https://github.com/fr4nk3nst1ner//blob/main/images/slack_cookie_demo.gif)
 
 
 ### Get User List
@@ -124,13 +124,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace
 Retrieve a list of users in your Slack workspace:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-users
+python3 .py --token YOUR_TOKEN --list-users
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-users
+python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-users
 ```
 
 Replace `YOUR_TOKEN`, `YOUR_COOKIE`, and other placeholders with your actual Slack API token, cookie, and workspace when running the commands.
@@ -151,7 +151,7 @@ The "d" cookie can be used to interact with the Slack API. This d cookie is used
 
 This is handled by you automatically when you pass the --cookie [d cookie value here]. When you pass the cookie, it should be passed in the same "smart" encoded (special characters only encoded) format as if it were being passed through the browser. If you need an example of this, just log in to Slack and grab your d cookie value from the browser developer tools or Burp. 
 
-![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/dtoken.png)
+![Alt Text](https://github.com/fr4nk3nst1ner//blob/main/images/dtoken.png)
 
 For more information on this, see [this](https://papermtn.co.uk/retrieving-and-using-slack-cookies-for-authentication/) article. 
 
