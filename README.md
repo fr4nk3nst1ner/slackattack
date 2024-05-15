@@ -42,6 +42,8 @@ pip3 install -r requirements.txt
 
 ## Usage
 
+![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/slack_token_demo.gif)
+
 You can use SlackAttack! with various command-line arguments to perform specific actions. Here's how to use each argument:
 
 - **Token**: You need to provide your Slack API token as an argument for authentication. Replace `YOUR_TOKEN` with your actual token.
@@ -57,11 +59,6 @@ Use the `--pillage` argument to scan conversations for secrets
 ```
 python3 slackattack.py --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com --pillage
 ```
-
-
-![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/slack_token_demo.gif)
-
-
 
 ### Check the permissions and what you can do with your token or cookie
 
