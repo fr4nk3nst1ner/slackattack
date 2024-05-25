@@ -77,7 +77,7 @@ You can use Slackattack with various command-line arguments to perform specific 
 Use the `--pillage` argument to scan conversations for secrets
 
 ```
-python3 .py --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com --pillage
+python3 slackattack.py --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com --pillage
 ```
 
 ### Check the permissions and what you can do with your token or cookie
@@ -85,13 +85,13 @@ python3 .py --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com -
 Use the `--check-permissions` argument to list permissions and return commands you can run:
 
 ```
-python3 .py --token YOUR_TOKEN --check-permissions
+python3 slackattack.py --token YOUR_TOKEN --check-permissions
 ```
 
 or
 
 ```
-python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --check-permissions
+python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --check-permissions
 ```
 
 ### Get Channel List
@@ -99,13 +99,13 @@ python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com
 Retrieve a list of channels in your Slack workspace:
 
 ```
-python3 .py --token YOUR_TOKEN --list-channels
+python3 slackattack.py --token YOUR_TOKEN --list-channels
 ```
 
 or
 
 ```
-python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-channels
+python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-channels
 ```
 
 ### Get File URLs
@@ -113,13 +113,13 @@ python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com
 Retrieve file URLs for a specific channel using the `--channel` argument:
 
 ```
-python3 .py --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID
+python3 slackattack.py --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID
 ```
 
 or
 
 ```
-python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-file-urls --channel CHANNEL_ID
+python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-file-urls --channel CHANNEL_ID
 ```
 
 ### Download Files
@@ -127,13 +127,13 @@ python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com
 Download files from Slack channels:
 
 ```
-python3 .py --token YOUR_TOKEN --download-files
+python3 slackattack.py --token YOUR_TOKEN --download-files
 ```
 
 or
 
 ```
-python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --download-files
+python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --download-files
 ```
 
 ![Alt Text](https://github.com/fr4nk3nst1ner//blob/main/images/slack_cookie_demo.gif)
@@ -144,13 +144,13 @@ python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com
 Retrieve a list of users in your Slack workspace:
 
 ```
-python3 .py --token YOUR_TOKEN --list-users
+python3 slackattack.py --token YOUR_TOKEN --list-users
 ```
 
 or
 
 ```
-python3 .py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-users
+python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-users
 ```
 
 Replace `YOUR_TOKEN`, `YOUR_COOKIE`, and other placeholders with your actual Slack API token, cookie, and workspace when running the commands.
