@@ -606,6 +606,28 @@ def save_output_to_json(data, filename):
     with open(filename, 'w') as json_file:
         json.dump(data, json_file, indent=2)
     
+class ExamplesAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        examples = """
+        Examples of usage:
+
+        Using a Slack API token:
+            python script.py --token xoxb-1234567890 --list-users
+            python script.py --token xoxb-1234567890 --list-channels
+            python script.py --token xoxb-1234567890 --test
+            python script.py --token xoxb-1234567890 --check-permissions
+            python script.py --token xoxb-1234567890 --pillage
+        
+        Using a user-supplied cookie:
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-users
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-channels
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --test
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --check-permissions
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --pillage
+        """
+        print(examples)
+        parser.exit()
+
 class CustomHelpFormatter(argparse.HelpFormatter):
     def format_help(self):
         return get_main_banner() + super().format_help()
@@ -616,7 +638,6 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--token", type=str, help="Slack API token")
     group.add_argument("--cookie", type=str, help="User-supplied cookie")
-    group.add_argument("--user-cookie", type=str, help="User session cookie (e.g., xoxd-...)")
     parser.add_argument("--workspace-url", type=str, help="Workspace URL for authenticating user session token")
     
     parser.add_argument("--pillage", action='store_true', help="Search conversations for secrets")
@@ -633,10 +654,22 @@ def main():
     parser.add_argument("--verbose", "-v", action='store_true', help="Enable verbose logging for troubleshooting")
     parser.add_argument("--proxy", "-p", type=str, help="Specify a proxy (e.g., http://127.0.0.1:8080)")
 
+    parser.add_argument("--examples", action=ExamplesAction, nargs=0, help="Show usage examples")
+
     args = parser.parse_args()
+
+    # Validate that --workspace-url and at least one action are provided when --cookie is used
+    if args.cookie and (not args.workspace_url or not any([args.test, args.list_users, args.list_channels, args.check_permissions, args.list_files, args.download_files, args.dump_logs, args.pillage])):
+        parser.error("--workspace-url and at least one action (e.g., --list-users, --list-channels, --check-permissions, etc.) must be provided when --cookie is used.")
 
     if args.cookie:
         args.cookie = f"d={args.cookie}"
+
+    # Validate that at least one action is specified when --token is used and that --workspace-url is not required
+    if args.token and not any([args.test, args.list_users, args.list_channels, args.check_permissions, args.list_files, args.download_files, args.dump_logs, args.pillage]):
+        parser.error("At least one action (e.g., --list-users, --list-channels, --check-permissions, etc.) must be specified when --token is used.")
+    if args.token and args.workspace_url:
+        parser.error("--workspace-url is not required when --token is used.")
 
     credentials = {}
     if args.token:
