@@ -15,6 +15,26 @@ Slackattack can perform various enumeration tasks, such as dumping channel infor
 - **Get User List**: Retrieve a list of users in your Slack workspace.
 - **Pillage conversations**: Leverages detect-secrets libraries to automatically find secrets in files and conversations. 
 
+```
+python3 slackattack.py  --examples                                                       
+
+        Examples of usage:
+
+        Using a Slack API token:
+            python script.py --token xoxb-1234567890 --list-users
+            python script.py --token xoxb-1234567890 --list-channels
+            python script.py --token xoxb-1234567890 --test
+            python script.py --token xoxb-1234567890 --check-permissions
+            python script.py --token xoxb-1234567890 --pillage
+        
+        Using a user-supplied cookie:
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-users
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-channels
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --test
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --check-permissions
+            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --pillage
+```
+
 ![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/banner.png)
 
 ## Installation
