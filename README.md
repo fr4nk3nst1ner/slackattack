@@ -21,18 +21,18 @@ python3 slackattack.py  --examples
         Examples of usage:
 
         Using a Slack API token:
-            python script.py --token xoxb-1234567890 --list-users
-            python script.py --token xoxb-1234567890 --list-channels
-            python script.py --token xoxb-1234567890 --test
-            python script.py --token xoxb-1234567890 --check-permissions
-            python script.py --token xoxb-1234567890 --pillage
+            python slackattack.py --token xoxb-1234567890 --list-users
+            python slackattack.py --token xoxb-1234567890 --list-channels
+            python slackattack.py --token xoxb-1234567890 --test
+            python slackattack.py --token xoxb-1234567890 --check-permissions
+            python slackattack.py --token xoxb-1234567890 --pillage
         
         Using a user-supplied cookie:
-            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-users
-            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-channels
-            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --test
-            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --check-permissions
-            python script.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --pillage
+            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-users
+            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-channels
+            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --test
+            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --check-permissions
+            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --pillage
 ```
 
 ![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/banner.png)
