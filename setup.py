@@ -1,3 +1,4 @@
+import os
 from setuptools import setup, find_packages
 
 with open('README.md', 'r') as f:
@@ -12,7 +13,7 @@ except FileNotFoundError:
 
 setup(
     name='slackattack',
-    version='1.0.0',
+    version='1.0.6',
     author='Jonathan Stines',
     description='Description of your tool',
     long_description=long_description,
