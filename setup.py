@@ -3,8 +3,11 @@ from setuptools import setup, find_packages
 with open('README.md', 'r') as f:
     long_description = f.read()
 
-with open('requirements.txt', 'r') as f:
-    requirements = f.read().splitlines()
+try:
+    with open('requirements.txt', 'r') as f:
+        requirements = f.read().splitlines()
+except FileNotFoundError:
+    requirements = []
 
 setup(
     name='slackattack',
@@ -15,7 +18,7 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/fr4nk3nst1ner/slackattack',
     packages=find_packages(),
-    install_requires=requirements,  # Include requirements from requirements.txt
+    install_requires=requirements,
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
