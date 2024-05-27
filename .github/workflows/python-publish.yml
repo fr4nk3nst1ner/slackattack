@@ -23,8 +23,6 @@ jobs:
         ls -la
     - name: Check file permissions
       run: ls -la requirements.txt
-    - name: find requirements 
-      run: find / -name requirements.txt 2>/dev/null
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
