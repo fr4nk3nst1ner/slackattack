@@ -18,7 +18,9 @@ jobs:
       with:
         python-version: '3.x'
     - name: Verify files
-      run: ls -la
+      run: |
+        pwd
+        ls -la
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
