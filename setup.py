@@ -5,7 +5,8 @@ with open('README.md', 'r') as f:
 
 try:
     with open('requirements.txt', 'r') as f:
-        requirements = f.read().splitlines()
+        requirements = f.read().splitlines() if os.path.exists('requirements.txt') else []
+
 except FileNotFoundError:
     requirements = []
 
