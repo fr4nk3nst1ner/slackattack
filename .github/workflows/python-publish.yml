@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [3.6]  
+        python-version: [3.9]
 
     steps:
     - uses: actions/checkout@v4
@@ -29,8 +29,8 @@ jobs:
       run: ls -la requirements.txt
     - name: Install dependencies and fix pip
       run: |
-        python -m ensurepip --upgrade
-        python -m pip install --upgrade setuptools wheel
+        python -m pip install --upgrade pip
+        python -m pip install setuptools wheel build
     - name: Clean build environment
       run: |
         rm -rf dist
