@@ -27,12 +27,15 @@ jobs:
         ls -la
     - name: Check file permissions
       run: ls -la requirements.txt
+    - name: Print Python version
+      run: python --version
     - name: Install dependencies and fix pip
       run: |
-        python -m pip uninstall -y pip
-        curl https://bootstrap.pypa.io/get-pip.py -O get-pip.py
-        python get-pip.py
+        python -m pip install --upgrade pip
         python -m pip install setuptools wheel build
+    - name: Clean build environment
+      run: |
+        rm -rf dist
     - name: Build package
       run: |
         python -m build --sdist --wheel --outdir dist --no-isolation
