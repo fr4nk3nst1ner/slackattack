@@ -7,7 +7,7 @@ name = "slackattack"
 version = "1.0.9"
 description = "Description of your tool"
 authors = [
-  { name="Jonathan Stines", email="" }
+  { name="Jonathan Stines", email="jonathan.stines@gmail.com" }
 ]
 license = { text = "MIT" }
 homepage = "https://github.com/fr4nk3nst1ner/slackattack"
