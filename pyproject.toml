@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slackattack"
-version = "1.0.9"
+version = "1.1.0"
 description = "Description of your tool"
 authors = [
   { name="Jonathan Stines", email="jonathan.stines@gmail.com" }
