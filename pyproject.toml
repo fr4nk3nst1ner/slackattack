@@ -23,9 +23,6 @@ dependencies = [
   "termcolor"
 ]
 
-[project.urls]
-"Homepage" = "https://github.com/fr4nk3nst1ner/slackattack"
-
 [project.scripts]
 slackattack = "slackattack:main"
 
