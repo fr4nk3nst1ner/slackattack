@@ -26,3 +26,5 @@ dependencies = [
 [project.scripts]
 slackattack = "slackattack:main"
 
+[dynamic]
+requires-python = ">=3.6"
