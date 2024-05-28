@@ -1,17 +1,21 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "slackattack"
 version = "1.1.0"
-description = "Description of your tool"
+description = "Slack post-exploitation script for leaked bot tokens and xoxd cookies"
 authors = [
-  { name="Jonathan Stines", email="jonathan.stines@gmail.com" }
+  { name = "Jonathan Stines", email = "jonathan.stines@gmail.com" }
 ]
-license = { text = "MIT" }
-homepage = "https://github.com/fr4nk3nst1ner/slackattack"
-requires-python = ">=3.6"
+readme = "README.md"
+license = { text = "UNKNOWN" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
+]
 dependencies = [
   "argparse",
   "requests",
@@ -22,9 +26,6 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/fr4nk3nst1ner/slackattack"
 
-[tool.setuptools.packages.find]
-where = ["slackattack"]
-
 [project.scripts]
-slackattack = "slackattack.slackattack:main"
+slackattack = "slackattack:main"
 
