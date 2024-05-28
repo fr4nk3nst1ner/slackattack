@@ -10,6 +10,8 @@ import urllib3
 from termcolor import colored
 import json
 
+VERSION = "1.1.9"
+
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -677,10 +679,9 @@ def get_main_banner():
 [90;40m▄▄▄▄▄▄▄░[0m[0m [90;40m▄▄▄▄▄▄▄▄░[0m[0m [90;40m▄▄▄░▒▄▄▄░[0m[0m [90;40m▄▄▄▄▄▄▄▄▒[0m[0m [90;40m▄▄▄░▄▄▄▄░[0m[0m [90;40m▄▄▄░▒▄▄▄░[0m[0m [90;40m░░▄▄▄▄░[37;40m [90;40m░[0m[0m [90;40m░░▄▄▄▄░[37;40m [90;40m░[0m[0m [90;40m▄▄▄░▒▄▄▄░[0m[0m [90;40m▄▄▄▄▄▄▄▄▒[0m[0m [90;40m▄▄▄░▄▄▄▄░[0m[0m [0m
 
 
-Slackattack v1.0.0
+Slackattack {version}
 By: Jonathan Stines - @fr4nk3nst1ner
-
-"""
+""".format(version=VERSION)
 
 def get_sub_banner():
     return """
@@ -691,6 +692,9 @@ def main():
     output_data = {}
     parser = argparse.ArgumentParser(description="Post-Ex tool for Slack bot and user tokens.", formatter_class=CustomHelpFormatter)
     group = parser.add_mutually_exclusive_group(required=True)
+
+    parser.add_argument('--version', action='version', version=f'%(prog)s {VERSION}')
+
     group.add_argument("--token", type=str, help="Slack API token")
     group.add_argument("--cookie", type=str, help="User-supplied cookie")
     parser.add_argument("--workspace-url", type=str, help="Workspace URL for authenticating user session token")
