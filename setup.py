@@ -13,7 +13,7 @@ except FileNotFoundError:
 
 setup(
     name='slackattack',
-    version='1.1.1',
+    version='1.1.8',
     author='Jonathan Stines',
     description='Description of your tool',
     long_description=long_description,
@@ -26,5 +26,4 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
-    python_requires='>=3.6',
 )
