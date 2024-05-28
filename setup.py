@@ -13,9 +13,9 @@ except FileNotFoundError:
 
 setup(
     name='slackattack',
-    version='1.1.8',
+    version='1.1.4',
     author='Jonathan Stines',
-    description='Description of your tool',
+    description='Slack post-exploitation script for leaked bot tokens and "d" cookies',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/fr4nk3nst1ner/slackattack',
