@@ -39,26 +39,16 @@ python3 slackattack.py  --examples
 
 ## Installation
 
-To use Slackattack, follow these installation steps:
+### From Pypi with Pip:
 
-1. Clone this repository to your local machine using Git:
-  
+`pip install slackattack`
+
+### From Github  
 ```  
-git clone https://github.com/fr4nk3nst1ner/slackattack.git
-```
-    
-2. Change your working directory to the project folder:
-  
-```  
+git clone https://github.com/fr4nk3nst1ner/slackattack.git 
 cd slackattack
-```
-    
-3. Install the required Python packages using pip:
-  
-```  
 pip3 install -r requirements.txt
-```
-    
+``` 
 
 ## Usage
 
@@ -136,7 +126,7 @@ or
 python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --download-files
 ```
 
-![Alt Text](https://github.com/fr4nk3nst1ner//blob/main/images/slack_cookie_demo.gif)
+![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/slack_cookie_demo.gif)
 
 
 ### Get User List
