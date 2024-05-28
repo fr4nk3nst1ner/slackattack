@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slackattack"
+version = "1.0.9"
+description = "Description of your tool"
+authors = [
+  { name="Jonathan Stines", email="" }
+]
+license = { text = "MIT" }
+homepage = "https://github.com/fr4nk3nst1ner/slackattack"
+requires-python = ">=3.6"
+dependencies = [
+  "argparse",
+  "requests",
+  "datetime",
+  "termcolor"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/fr4nk3nst1ner/slackattack"
+
+[tool.setuptools.packages.find]
+where = ["slackattack"]
+
+[project.scripts]
+slackattack = "slackattack.slackattack:main"
+
