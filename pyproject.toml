@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slackattack"
-version = "1.1.8"
+version = "1.1.9"
 description = "Slack post-exploitation script for leaked bot tokens and xoxd cookies"
 authors = [
   { name = "Jonathan Stines", email = "jonathan.stines@gmail.com" }
 ]
 readme = "README.md"
-license = { text = "UNKNOWN" }
+license = { text = "MIT" }
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
