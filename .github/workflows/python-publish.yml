@@ -17,6 +17,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -28,12 +30,10 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install setuptools wheel build bump2version
 
-    - name: Bump version
-      id: bump_version
+    - name: Bump version and push tag
       run: |
         bump2version patch --allow-dirty --commit --tag
-        VERSION=$(python setup.py --version)
-        echo "Bumped version to $VERSION"
+        git push origin HEAD --tags
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
