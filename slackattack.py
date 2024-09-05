@@ -9,6 +9,9 @@ import uuid
 import urllib3
 from termcolor import colored
 import json
+import random
+import time
+from colorama import Fore, Style, init
 
 VERSION = "1.1.9"
 
@@ -632,56 +635,73 @@ class ExamplesAction(argparse.Action):
 
 class CustomHelpFormatter(argparse.HelpFormatter):
     def format_help(self):
-        return get_main_banner() + super().format_help()
+        # Print the banner
+        print_banner()
+        # Return the formatted help text
+        return super().format_help()
+
+# Initialize colorama
+init(autoreset=True)
+
+def interpolate_color(c1, c2, factor):
+    """Interpolate between two colors based on the factor (0.0 to 1.0)."""
+    return tuple(int(c1[i] + (c2[i] - c1[i]) * factor) for i in range(3))
+
+def bilinear_interpolate(x, y, colors, width, height):
+    """Perform bilinear interpolation for the 2D gradient."""
+    # Top-left to bottom-left gradient (x-axis)
+    c_top = interpolate_color(colors['top_left'], colors['top_right'], x / width)
+    c_bottom = interpolate_color(colors['bottom_left'], colors['bottom_right'], x / width)
+    
+    # Interpolating between the top and bottom gradients (y-axis)
+    return interpolate_color(c_bottom, c_top, y / height)
+
+def rgb_to_ansi(r, g, b):
+    """Convert RGB values to an ANSI escape code."""
+    return f'\033[38;2;{r};{g};{b}m'
+
+def colorize_text_with_2d_gradient(text, width, height, colors):
+    """Apply a 2D gradient color effect to the given text."""
+    colored_text = ""
+    lines = text.splitlines()
+    
+    for y, line in enumerate(lines):
+        for x, char in enumerate(line):
+            r, g, b = bilinear_interpolate(x, y, colors, width - 1, height - 1)
+            colored_text += rgb_to_ansi(r, g, b) + char
+        colored_text += '\n'
+    
+    return colored_text + Style.RESET_ALL
+
+def print_banner(silence=False):
+    if not silence:
+        banner_text = get_main_banner()
+        width = max(len(line) for line in banner_text.splitlines())
+        height = len(banner_text.splitlines())
+        colors = {
+            'top_left': (255, 0, 0),  # Light Blue JS: seems like bottom left 
+            'top_right': (255, 165, 0), # Light Green JS: seems like bottom right 
+            'bottom_left': (173, 216, 230),   # Red JS: seems like top left 
+            'bottom_right': (144, 238, 144) # Light Orange JS: Seems like top right 
+        }
+        colored_banner = colorize_text_with_2d_gradient(banner_text, width, height, colors)
+        print(colored_banner)
 
 def get_main_banner():
     return """
-[31m                                                           @@%%@
-[37m                                                          @*:---#@@
-[31m                                             @     @@#=*%%-:::-------%@
-[37m                                           @%@   @%=::::::::::--------*@
-[31m                                          @*:*%%#-::::::::::------------%@
-[37m                                          @=:::::::=%%%*=*%@#@%----------=%@
-[31m                                          @+::::::#+::::::::::=%*-=*%@@%=---%@
-[37m                                         @+--%*:#=::::::::::-@-::::::::#%----#@
-[31m                                          %-@=::::::::::::::::-=::::::%*-----*@
-[37m                                           @+::::::::::::::::::::::::::#*----#@
-[31m                                          @#:::%@:::::+:::-*##-:::::::-#=%=--%@
-[37m                                          @=:::@#:::=%:::::::*@-::::::=*=#%-*@
-[31m         @@%%@@                          @@::::::::##:::::::::::::::::*=++%%@
-[37m       @%=::::%@                         @#:::::::%%:::::::::::::::::==-+=%@
-[31m      @%::::::%@                         @#::::::::%#::::::::::::::::::::*@@
-[37m      @*:::::*@                          @%::::::::::::::::%*:::::::::::::=@@
-[31m      @#:::::%@                          @@:-%*+-:::::-+*+-:=@-:::::::::::#@
-[37m       @-::::#@                           @+:*#+:........-##:%-:::::::--#@@
-[31m       @%-::::=%@                         @@:::::=*%%%%#+-:::::::::::%@@@
-[37m  @%+::::+#%*-::-%@                        @%:::::=*%+:::::::::::::=@@
-[31m@%:::::::::::-%+::+@                        @%-::::::::::::::::::=%%@@
-[37m@%:::::::::::::%:::=@@@@@                    @@@:::::::::::::::##+#----%@@@
-[31m @%*%%**#%#+::=%::::%%#**##%%%@@@@@@@@@%%%###**%+%*:::::::::::::=%-----##*#%@@
-[37m @#:::::::::-%#-::::%-%************************%=--+%@%%#**::::#%-----#%******%@
-[31m @=::::::::::::#+::%-:%************************%+-----+%%%##%@+------%#*********
-[37m  @@#%%%%%#=-::+#:-%::%*************************%+-----------------%%***********
-[31m  @*:::::::::=%*::#=:+%***************************%------------=#%%*************
-[37m  @%-:::::::::-%:-%:=%******************%********##--------*%@%#****************
-[31m   @@@%%##*##%*:*#:*%****************#%@*********%*-------#%********************
-[37m      @@%#++*#%*:-%************#%@@@@  @*********%+-------@#********************
-[31m              @@@@@@@@@@@@@@@@@       @@*********@-------+@*********************[0m
-
-
-
-[90;40m▀▀▀▀▀▀▀▓[0m[0m [90;40m▀▀▀▀█▓▒░▓[0m[0m [90;40m▀▀▀▀▀▀▀▀▓[0m[0m [90;40m▀▀▀▀▀▀▀▀▓[0m[0m [90;40m▀▀▀▓▀▀▀▀▓[0m[0m [90;40m▀▀▀▀▀▀▀▀▓[0m[0m [90;40m▀▀▀▀▀▀▀▀▓[0m[0m [90;40m▀▀▀▀▀▀▀▀▓[0m[0m [90;40m▀▀▀▀▀▀▀▀▓[0m[0m [90;40m▀▀▀▀▀▀▀▀▓[0m[0m [90;40m▀▀▀▓▀▀▀▀▓[0m[0m [0m
-[97;44m:::[97;41m▀▀▀▀[90;40m▐[0m[0m [97;44m:::[37;40m [90;40m▓▒░░▓[0m[0m [97;44m:::[97;41m▀▀▀▀[31;40m▄[90;40m▐[0m[0m [97;44m:::[97;41m▀▀▀▀▀[90;40m▐[0m[0m [97;44m:::[90;40m▐[37;40m [97;41m▀▀▀[90;40m▐[0m[0m [97;44m:::[97;41m▀▀▀▀[31;40m▄[90;40m▐[0m[0m [97;44m:::[97;41m▀▀▀▀▀[90;40m▐[0m[0m [97;44m:::[97;41m▀▀▀▀▀[90;40m▐[0m[0m [97;44m:::[97;41m▀▀▀▀[31;40m▄[90;40m▐[0m[0m [97;44m:::[97;41m▀▀▀▀▀[90;40m▐[0m[0m [97;44m:::[90;40m▐[37;40m [97;41m▀▀▀[90;40m▐[0m[0m [0m
-[97;44m:::[37;40m [97;40m▀▀▀[90;40m▐[0m[0m [97;44m:::[37;40m [90;40m▓▓▒░▒[0m[0m [97;44m:::[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;44m:::[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;44m:::[37;40m [97;41m▀▀▀[37;40m [90;40m▓[0m[0m [97;44m:::[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;44m:::[97;41m▀▀[37;40m [90;40m▄▄░[0m[0m [97;44m:::[97;41m▀▀[37;40m [90;40m▄▄░[0m[0m [97;44m:::[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;44m:::[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;44m:::[37;40m [97;41m▀▀▀[37;40m [90;40m▓[0m[0m [0m
-[97;40m▀[97;41m▀▀▀▀▀[31;40m▄[90;40m▐[0m[0m [97;41m▀▀▀[37;40m [90;40m▀▀▀▀▒[0m[0m [97;41m▀▀▀▀▀▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[90;40m▐░[37;40m   [90;40m▐[0m[0m [97;41m▀▀▀▀▀▀[37;40m [90;40m▐▓[0m[0m [97;41m▀▀▀▀▀▀▀▀[90;40m▐[0m[0m [90;40m▄▄[37;40m [97;41m▀▀[37;40m [90;40m▓▓▒[0m[0m [90;40m▄▄[37;40m [97;41m▀▀[37;40m [90;40m▓▓▒[0m[0m [97;41m▀▀▀▀▀▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[90;40m▐░[37;40m   [90;40m▐[0m[0m [97;41m▀▀▀▀▀▀[37;40m [90;40m▐▓[0m[0m [0m
-[31;40m▄▄[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[37;40m [97;41m▀▀▀[37;40m [90;40m▐[0m[0m [97;41m▀▀▀[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [90;40m▓▓[37;40m [97;41m▀▀[37;40m [90;40m░▒░[0m[0m [90;40m▓▓[37;40m [97;41m▀▀[37;40m [90;40m░▒░[0m[0m [97;41m▀▀▀[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[37;40m [97;41m▀▀▀[37;40m [90;40m▐[0m[0m [0m
-[97;41m▀▀▀▀▀▀[97;40m▀[90;40m▐[0m[0m [97;41m▀▀▀▀▀▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[90;40m▐[37;40m [97;41m▀▀▀[90;40m▐[0m[0m [97;40m▀[97;41m▀▀▀▀▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[90;40m▐[37;40m [97;41m▀▀▀[90;40m▐[0m[0m [90;40m░▒[37;40m [97;41m▀▀[37;40m [90;40m░░[37;40m [0m[0m [90;40m░▒[37;40m [97;41m▀▀[37;40m [90;40m░░[37;40m [0m[0m [97;41m▀▀▀[90;40m▐[37;40m [97;41m▀▀▀[90;40m▐[0m[0m [97;40m▀[97;41m▀▀▀▀▀▀▀[90;40m▐[0m[0m [97;41m▀▀▀[37;40m  [97;41m▀▀▀[90;40m▐[0m[0m [0m
-[90;40m▄▄▄▄▄▄▄░[0m[0m [90;40m▄▄▄▄▄▄▄▄░[0m[0m [90;40m▄▄▄░▒▄▄▄░[0m[0m [90;40m▄▄▄▄▄▄▄▄▒[0m[0m [90;40m▄▄▄░▄▄▄▄░[0m[0m [90;40m▄▄▄░▒▄▄▄░[0m[0m [90;40m░░▄▄▄▄░[37;40m [90;40m░[0m[0m [90;40m░░▄▄▄▄░[37;40m [90;40m░[0m[0m [90;40m▄▄▄░▒▄▄▄░[0m[0m [90;40m▄▄▄▄▄▄▄▄▒[0m[0m [90;40m▄▄▄░▄▄▄▄░[0m[0m [0m
-
+  █████████  ████                    █████           █████████   █████   █████                     █████     
+ ███░░░░░███░░███                   ░░███           ███░░░░░███ ░░███   ░░███                     ░░███      
+░███    ░░░  ░███   ██████    ██████ ░███ █████    ░███    ░███ ███████ ███████   ██████    ██████ ░███ █████
+░░█████████  ░███  ░░░░░███  ███░░███░███░░███     ░███████████░░░███░ ░░░███░   ░░░░░███  ███░░███░███░░███ 
+ ░░░░░░░░███ ░███   ███████ ░███ ░░░ ░██████░      ░███░░░░░███  ░███    ░███     ███████ ░███ ░░░ ░██████░  
+ ███    ░███ ░███  ███░░███ ░███  ███░███░░███     ░███    ░███  ░███ ███░███ ██████░░███ ░███  ███░███░░███ 
+░░█████████  █████░░████████░░██████ ████ █████    █████   █████ ░░█████ ░░█████░░████████░░██████ ████ █████
+ ░░░░░░░░░  ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░    ░░░░░   ░░░░░   ░░░░░   ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░ 
 
 Slackattack {version}
 By: Jonathan Stines - @fr4nk3nst1ner
 """.format(version=VERSION)
+
 
 def get_sub_banner():
     return """
@@ -742,12 +762,25 @@ def main():
     else:
         proxy = None
 
+    # Validate credentials before proceeding
+    if args.test or args.list_channels or args.list_users or args.check_permissions or args.list_files or args.download_files or args.dump_logs or args.pillage:
+        if args.token:
+            if not test_credentials(credentials, proxy):
+                print("[ERROR]: Invalid Slack API token.")
+                return
+        elif args.cookie:
+            if not make_cookie_request(args.workspace_url, args.cookie, proxy):
+                print("[ERROR]: Invalid Slack user cookie or workspace URL.")
+                return
+
     if args.test:
         test_credentials(credentials, proxy)
 
     elif args.list_channels:
         channel_list = list_channels(credentials, proxy)
-        user_membership = []
+        if channel_list is None:
+            print("[ERROR]: Unable to retrieve channels. Invalid Slack API token or cookie.")
+            return
 
         output_data = {"Channels": []}
 
@@ -769,19 +802,12 @@ def main():
         else:
             print(json.dumps(output_data, indent=2))
 
-#    elif args.list_file_urls:
-#        channel_list = list_channels(credentials, proxy)
-#        for channel in channel_list:
-#            channel_id = channel['id']
-#            list_file_urls(credentials, channel_id, proxy)
-
-        if args.output_json:
-            save_output_to_json(output_data, args.output_json)
-        else:
-            print(json.dumps(output_data, indent=2))
-
     elif args.list_files:
-        all_file_urls = list_files(credentials, proxy)  # Pass the verbose flag
+        all_file_urls = list_files(credentials, proxy)
+        if all_file_urls is None:
+            print("[ERROR]: Unable to list files. Invalid Slack API token or cookie.")
+            return
+
         print("List of All File URLs:")
         for file_url in all_file_urls:
             print(file_url)
@@ -793,19 +819,24 @@ def main():
 
     elif args.download_files:
         channel_list = list_channels(credentials, proxy=proxy)
+        if channel_list is None:
+            print("[ERROR]: Unable to retrieve channels for file download. Invalid Slack API token or cookie.")
+            return
+
         all_file_urls = []
         for channel in channel_list:
-            # Extract the channel_id from the channel dictionary
-            channel_id = channel['id']
-            file_urls = list_file_urls(credentials, channel_id, proxy=proxy)
-            all_file_urls.extend(file_urls)
+            file_urls = list_file_urls(credentials, channel['id'], proxy=proxy)
+            if file_urls:
+                all_file_urls.extend(file_urls)
         download_files(credentials, all_file_urls, args.output_directory, proxy=proxy)
 
     elif args.list_users:
         user_list = list_user_list(credentials, proxy=proxy)
+        if user_list is None:
+            print("[ERROR]: Unable to retrieve users. Invalid Slack API token or cookie.")
+            return
 
-        output_data = {"Users": []}  # Initialize 'Users' list here
-
+        output_data = {"Users": []}
         for user in user_list:
             user_info = {
                 "User ID": user['id'],
@@ -825,14 +856,16 @@ def main():
             print(json.dumps(output_data, indent=2))
 
     elif args.check_permissions:
-        proxy = args.proxy
         permissions = check_permissions(credentials, use_proxy=True, proxy_url=proxy)
+        if permissions is None:
+            print("[ERROR]: Unable to check permissions. Invalid Slack API token or cookie.")
+            return
+
         print("API Token Permissions:")
         for endpoint, permission in permissions['API Token Permissions'].items():
             print(f"{endpoint}: {permission}")
 
-        print()
-        print("Available Flags:")
+        print("\nAvailable Flags:")
         for flag in permissions['Available Flags']:
             print(flag)
 
@@ -842,17 +875,15 @@ def main():
             print(json.dumps(output_data, indent=2))
 
     elif args.dump_logs:
-        dump_logs(credentials, proxy)
-
-        if args.output_json:
-            save_output_to_json(output_data, args.output_json)
-        else:
-            print(json.dumps(output_data, indent=2))
-
-    output_data = {}
+        if not dump_logs(credentials, proxy):
+            print("[ERROR]: Unable to dump logs. Invalid Slack API token or cookie.")
+            return
 
     if args.pillage:
         output_data = pillage_conversations(credentials, proxy=proxy)
+        if output_data is None:
+            print("[ERROR]: Unable to pillage conversations. Invalid Slack API token or cookie.")
+            return
 
         if args.output_json:
             save_output_to_json(output_data, args.output_json)
@@ -861,3 +892,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
