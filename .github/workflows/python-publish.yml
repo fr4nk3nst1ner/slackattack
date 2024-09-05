@@ -5,7 +5,7 @@ on:
     types: [published]
 
 permissions:
-  contents: write  # Updated to allow committing the version bump
+  contents: write  
 
 jobs:
   deploy:
