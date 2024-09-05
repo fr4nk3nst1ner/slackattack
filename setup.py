@@ -13,7 +13,7 @@ except FileNotFoundError:
 
 setup(
     name='slackattack',
-    version='1.1.9',
+    version='1.2.0',
     author='Jonathan Stines',
     description='Slack post-exploitation script for leaked bot tokens and "d" cookies',
     long_description=long_description,
@@ -26,5 +26,5 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
-    scripts=['slackattack.py'],  
+    scripts=['slackattack.py'],
 )
