@@ -13,7 +13,8 @@ import random
 import time
 from colorama import Fore, Style, init
 
-VERSION = "1.2.0"
+from _version import __version__ 
+
 
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -698,9 +699,9 @@ def get_main_banner():
 ░░█████████  █████░░████████░░██████ ████ █████    █████   █████ ░░█████ ░░█████░░████████░░██████ ████ █████
  ░░░░░░░░░  ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░    ░░░░░   ░░░░░   ░░░░░   ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░
 
-Slackattack {version}
+Slackattack v{version}
 By: Jonathan Stines - @fr4nk3nst1ner
-""".format(version=VERSION)
+""".format(version=__version__)
 
 
 def get_sub_banner():
@@ -713,7 +714,7 @@ def main():
     parser = argparse.ArgumentParser(description="Post-Ex tool for Slack bot and user tokens.", formatter_class=CustomHelpFormatter)
     group = parser.add_mutually_exclusive_group(required=True)
 
-    parser.add_argument('--version', action='version', version=f'%(prog)s {VERSION}')
+    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
 
     group.add_argument("--token", type=str, help="Slack API token")
     group.add_argument("--cookie", type=str, help="User-supplied cookie")
