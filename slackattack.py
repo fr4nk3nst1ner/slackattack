@@ -13,7 +13,7 @@ import random
 import time
 from colorama import Fore, Style, init
 
-VERSION = "1.1.9"
+VERSION = "1.2.0"
 
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -652,7 +652,7 @@ def bilinear_interpolate(x, y, colors, width, height):
     # Top-left to bottom-left gradient (x-axis)
     c_top = interpolate_color(colors['top_left'], colors['top_right'], x / width)
     c_bottom = interpolate_color(colors['bottom_left'], colors['bottom_right'], x / width)
-    
+
     # Interpolating between the top and bottom gradients (y-axis)
     return interpolate_color(c_bottom, c_top, y / height)
 
@@ -664,13 +664,13 @@ def colorize_text_with_2d_gradient(text, width, height, colors):
     """Apply a 2D gradient color effect to the given text."""
     colored_text = ""
     lines = text.splitlines()
-    
+
     for y, line in enumerate(lines):
         for x, char in enumerate(line):
             r, g, b = bilinear_interpolate(x, y, colors, width - 1, height - 1)
             colored_text += rgb_to_ansi(r, g, b) + char
         colored_text += '\n'
-    
+
     return colored_text + Style.RESET_ALL
 
 def print_banner(silence=False):
@@ -679,24 +679,24 @@ def print_banner(silence=False):
         width = max(len(line) for line in banner_text.splitlines())
         height = len(banner_text.splitlines())
         colors = {
-            'top_left': (255, 0, 0),  # Light Blue JS: seems like bottom left 
-            'top_right': (255, 165, 0), # Light Green JS: seems like bottom right 
-            'bottom_left': (173, 216, 230),   # Red JS: seems like top left 
-            'bottom_right': (144, 238, 144) # Light Orange JS: Seems like top right 
+            'top_left': (255, 0, 0),  # Light Blue JS: seems like bottom left
+            'top_right': (255, 165, 0), # Light Green JS: seems like bottom right
+            'bottom_left': (173, 216, 230),   # Red JS: seems like top left
+            'bottom_right': (144, 238, 144) # Light Orange JS: Seems like top right
         }
         colored_banner = colorize_text_with_2d_gradient(banner_text, width, height, colors)
         print(colored_banner)
 
 def get_main_banner():
     return """
-  █████████  ████                    █████           █████████   █████   █████                     █████     
- ███░░░░░███░░███                   ░░███           ███░░░░░███ ░░███   ░░███                     ░░███      
+  █████████  ████                    █████           █████████   █████   █████                     █████
+ ███░░░░░███░░███                   ░░███           ███░░░░░███ ░░███   ░░███                     ░░███
 ░███    ░░░  ░███   ██████    ██████ ░███ █████    ░███    ░███ ███████ ███████   ██████    ██████ ░███ █████
-░░█████████  ░███  ░░░░░███  ███░░███░███░░███     ░███████████░░░███░ ░░░███░   ░░░░░███  ███░░███░███░░███ 
- ░░░░░░░░███ ░███   ███████ ░███ ░░░ ░██████░      ░███░░░░░███  ░███    ░███     ███████ ░███ ░░░ ░██████░  
- ███    ░███ ░███  ███░░███ ░███  ███░███░░███     ░███    ░███  ░███ ███░███ ██████░░███ ░███  ███░███░░███ 
+░░█████████  ░███  ░░░░░███  ███░░███░███░░███     ░███████████░░░███░ ░░░███░   ░░░░░███  ███░░███░███░░███
+ ░░░░░░░░███ ░███   ███████ ░███ ░░░ ░██████░      ░███░░░░░███  ░███    ░███     ███████ ░███ ░░░ ░██████░
+ ███    ░███ ░███  ███░░███ ░███  ███░███░░███     ░███    ░███  ░███ ███░███ ██████░░███ ░███  ███░███░░███
 ░░█████████  █████░░████████░░██████ ████ █████    █████   █████ ░░█████ ░░█████░░████████░░██████ ████ █████
- ░░░░░░░░░  ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░    ░░░░░   ░░░░░   ░░░░░   ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░ 
+ ░░░░░░░░░  ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░    ░░░░░   ░░░░░   ░░░░░   ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░
 
 Slackattack {version}
 By: Jonathan Stines - @fr4nk3nst1ner
