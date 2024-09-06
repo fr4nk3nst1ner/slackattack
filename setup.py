@@ -11,9 +11,14 @@ try:
 except FileNotFoundError:
     requirements = []
 
+
+version = {}
+with open(os.path.join('slackattack', '_version.py')) as f:
+    exec(f.read(), version)
+
 setup(
     name='slackattack',
-    version='1.2.0',
+    version=version['__version__'],
     author='Jonathan Stines',
     description='Slack post-exploitation script for leaked bot tokens and "d" cookies',
     long_description=long_description,
