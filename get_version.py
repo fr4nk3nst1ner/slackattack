@@ -1,8 +1,11 @@
-# get_version.py
+import os
 import re
 
+# Get the current directory (where _version.py should be located)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Open and read the _version.py file
-with open("slackattack/_version.py", "r") as f:
+with open(os.path.join(current_dir, "_version.py"), "r") as f:
     version_file = f.read()
 
 # Extract the version number using regex

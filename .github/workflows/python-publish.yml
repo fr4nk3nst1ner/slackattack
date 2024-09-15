@@ -60,6 +60,11 @@ jobs:
       env:
         LOG_LEVEL: ${{ github.event.inputs.logLevel }}
 
+    - name: Show current directory and files
+      run: |
+        pwd
+        ls -alh
+
     - name: Extract current version
       id: get_version
       run: echo "::set-output name=version::$(python get_version.py)"
