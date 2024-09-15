@@ -67,14 +67,27 @@ jobs:
 
     - name: Extract current version
       id: get_version
-      run: echo "::set-output name=version::$(python get_version.py)"
-
-    - name: Bump version and push tag
       run: |
-        bump2version patch --current-version ${{ steps.get_version.outputs.version }} --commit --tag --allow-dirty
-        git push origin HEAD --tags
+        VERSION=$(python get_version.py)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "Current version: $VERSION"
+
+    - name: Bump version and push to new branch
+      run: |
+        # Create a new branch for version bump
+        git checkout -b version-bump-v${{ env.VERSION }}
+        bump2version patch --current-version ${{ env.VERSION }} --commit --tag --allow-dirty
+        git push origin version-bump-v${{ env.VERSION }} --tags
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        branch: version-bump-v${{ env.VERSION }}
+        title: "Version Bump to v${{ env.VERSION }}"
+        body: "Automated version bump to v${{ env.VERSION }}"
 
     - name: Verify files
       run: |
