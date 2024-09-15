@@ -37,7 +37,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0   
+        fetch-depth: 0
+        ref: main  #
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -97,8 +98,12 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         branch: version-bump-v${{ env.VERSION }}
+        base: main  
         title: "Version Bump to v${{ env.VERSION }}"
         body: "Automated version bump to v${{ env.VERSION }}"
+        commit-message: "[create-pull-request] automated change"
+        committer: "GitHub <noreply@github.com>"
+        author: "fr4nk3nst1ner <fr4nk3nst1ner@users.noreply.github.com>"
 
     - name: Verify files
       run: |
