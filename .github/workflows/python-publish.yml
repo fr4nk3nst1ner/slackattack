@@ -11,9 +11,9 @@ on:
         default: 'warning'
         type: choice
         options:
-        - info
-        - warning
-        - debug
+          - info
+          - warning
+          - debug
       tags:
         description: 'Test scenario tags'
         required: false
@@ -54,6 +54,12 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install setuptools wheel build bump2version
 
+    - name: Set logging level
+      run: |
+        echo "Setting log level to ${{ github.event.inputs.logLevel }}"
+      env:
+        LOG_LEVEL: ${{ github.event.inputs.logLevel }}
+
     - name: Extract current version
       id: get_version
       run: echo "::set-output name=version::$(python get_version.py)"
@@ -87,6 +93,11 @@ jobs:
       run: |
         python -m build --sdist --wheel --outdir dist --no-isolation
         python -m pip install .
+
+    - name: Conditional step for tags
+      if: ${{ github.event.inputs.tags == 'true' }}
+      run: |
+        echo "Running additional steps for tags scenario."
 
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
