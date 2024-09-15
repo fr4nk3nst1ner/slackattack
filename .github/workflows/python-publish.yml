@@ -35,9 +35,13 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install setuptools wheel build bump2version
 
+    - name: Extract current version
+      id: get_version
+      run: echo "::set-output name=version::$(python get_version.py)"
+
     - name: Bump version and push tag
       run: |
-        bump2version patch --allow-dirty --commit --tag
+        bump2version patch --commit --tag
         git push origin HEAD --tags
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -55,7 +59,10 @@ jobs:
 
     - name: Clean build environment
       run: |
-        rm -rf dist
+        rm -rf dist build
+
+    - name: Verify version before publishing
+      run: python -c "import slackattack; print(slackattack.__version__)"
 
     - name: Build package
       run: |
