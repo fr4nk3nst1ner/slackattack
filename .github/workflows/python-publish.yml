@@ -75,20 +75,20 @@ jobs:
     - name: Check if tag exists
       id: check_tag
       run: |
-        if git rev-parse "v${{ env.VERSION }}" >/dev/null 2>&1; then
-          echo "Tag v${{ env.VERSION }} already exists."
+        if git rev-parse "${{ env.VERSION }}" >/dev/null 2>&1; then
+          echo "Tag ${{ env.VERSION }} already exists."
           echo "tag_exists=true" >> $GITHUB_ENV
         else
-          echo "Tag v${{ env.VERSION }} does not exist."
+          echo "Tag ${{ env.VERSION }} does not exist."
           echo "tag_exists=false" >> $GITHUB_ENV
 
     - name: Bump version and push to new branch
       if: env.tag_exists == 'false'
       run: |
         # Create a new branch for version bump
-        git checkout -b version-bump-v${{ env.VERSION }}
+        git checkout -b version-bump-${{ env.VERSION }}
         bump2version patch --current-version ${{ env.VERSION }} --commit --tag --allow-dirty
-        git push origin version-bump-v${{ env.VERSION }} --tags
+        git push origin version-bump-${{ env.VERSION }} --tags
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
