@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "slackattack"
 description = "Slack post-exploitation script for leaked bot tokens and xoxd cookies"
+version = "0.0.0"
 authors = [
   { name = "Jonathan Stines", email = "jonathan.stines@gmail.com" }
 ]
