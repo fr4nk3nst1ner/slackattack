@@ -9,12 +9,9 @@ import uuid
 import urllib3
 from termcolor import colored
 import json
-import random
-import time
-from colorama import Fore, Style, init
+from colorama import Style, init
 
 from _version import __version__ 
-
 
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -26,21 +23,24 @@ ALREADY_SIGNED_IN_TEAM_REGEX = r"([a-zA-Z0-9\-]+\.slack\.com)"
 SLACK_API_TOKEN_REGEX = r"(xox[a-zA-Z]-[a-zA-Z0-9-]+)"
 WORKSPACE_VALID_EMAILS_REGEX = r"email-domains-formatted=\"(@.+?)[\"]"
 PRIVATE_KEYS_REGEX = r"([-]+BEGIN [^\s]+ PRIVATE KEY[-]+[\s]*[^-]*[-]+END [^\s]+ PRIVATE KEY[-]+)"
-S3_REGEX = r"(" \
-           r"[a-zA-Z0-9-\.\_]+\.s3\.amazonaws\.com" \
-           r"|s3://[a-zA-Z0-9-\.\_]+" \
-           r"|s3-[a-zA-Z0-9-\.\_\/]+" \
-           r"|s3.amazonaws.com/[a-zA-Z0-9-\.\_]+" \
-           r"|s3.console.aws.amazon.com/s3/buckets/[a-zA-Z0-9-\.\_]+)"
+S3_REGEX = (
+    r"[a-zA-Z0-9-\.\_]+\.s3\.amazonaws\.com"
+    r"|s3://[a-zA-Z0-9-\.\_]+"
+    r"|s3-[a-zA-Z0-9-\.\_\/]+"
+    r"|s3.amazonaws.com/[a-zA-Z0-9-\.\_]+"
+    r"|s3.console.aws.amazon.com/s3/buckets/[a-zA-Z0-9-\.\_]+"
+)
 
-CREDENTIALS_REGEX = r"(?i)(" \
-                    r"password\s*[`=:\"]+\s*[^\s]+|" \
-                    r"password is\s*[`=:\"]*\s*[^\s]+|" \
-                    r"pwd\s*[`=:\"]*\s*[^\s]+|" \
-                    r"passwd\s*[`=:\"]+\s*[^\s]+)"
+CREDENTIALS_REGEX = (
+    r"(?i)(password\s*[=:\"]+\s*[^\s]+|password is\s*[=:\"]*\s*[^\s]+|pwd\s*[=:\"]*\s*[^\s]+"
+    r"|passwd\s*[=:\"]+\s*[^\s]+)"
+)
 
-AWS_KEYS_REGEX = r"(?!com/archives/[A-Z0-9]{9}/p[0-9]{16})" \
-                 r"((?<![A-Za-z0-9/+])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+])|(?<![A-Z0-9])[A-Z0-9]{20}(?![A-Z0-9]))"
+AWS_KEYS_REGEX = (
+    r"(?!com/archives/[A-Z0-9]{9}/p[0-9]{16})"
+    r"((?<![A-Za-z0-9/+])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+])|(?<![A-Z0-9])[A-Z0-9]{20}(?![A-Z0-9]))"
+)
+
 S3_QUERIES = "|".join(["s3.amazonaws.com", "s3://", "https://s3", "http://s3"])
 CREDENTIALS_QUERIES = "|".join(["password:", "password is", "pwd", "passwd"])
 AWS_KEYS_QUERIES = "|".join(["ASIA*", "AKIA*"])
@@ -83,6 +83,19 @@ LINKS_QUERIES = "|".join(["amazonaws",
                  "trello"])
 
 def make_cookie_request(workspace_url, user_cookie, proxy=None, verify_ssl=False):
+    """
+    Sends a GET request using a user-supplied cookie to authenticate the user.
+
+    Args:
+        workspace_url (str): Slack workspace URL.
+        user_cookie (str): The user cookie for authentication.
+        proxy (str): Optional proxy URL.
+        verify_ssl (bool): Whether to verify SSL certificates.
+
+    Returns:
+        str: User session token if found, otherwise None.
+    """
+
     try:
         # remove extra 'd='  from cookie
         user_cookie = re.sub(r'^d=', '', user_cookie)
@@ -103,10 +116,32 @@ def make_cookie_request(workspace_url, user_cookie, proxy=None, verify_ssl=False
         return None
 
 def make_slack_request(url, credentials, method="POST", payload=None, proxy=None, verify_ssl=False):
+    """
+    Makes a Slack API request using either a token or a cookie for authentication.
+
+    Args:
+        url (str): The Slack API endpoint.
+        credentials (dict): A dictionary containing authentication credentials.
+        method (str): The HTTP method to use, either 'POST' or 'GET'.
+        payload (str): Data to send in the request body.
+        proxy (str): Optional proxy URL.
+        verify_ssl (bool): Whether to verify SSL certificates.
+
+    Returns:
+        dict: The response data as a dictionary, or None if the request fails.
+    """
+
+    headers = {}
+
+    # Use token-based authentication if available
     if 'token' in credentials:
         headers = {"Authorization": f"Bearer {credentials['token']}"}
+
+    # Use cookie-based authentication if token is not provided
     elif 'cookie' in credentials:
-        user_session_token = make_cookie_request(credentials['workspace_url'], credentials['cookie'], proxy, verify_ssl)
+        user_session_token = make_cookie_request(
+            credentials['workspace_url'], credentials['cookie'], proxy, verify_ssl
+        )
         if not user_session_token:
             print("[ERROR]: Unable to obtain user session token.")
             return None
@@ -115,10 +150,10 @@ def make_slack_request(url, credentials, method="POST", payload=None, proxy=None
         headers = {
             "Content-Type": f"multipart/form-data; boundary={boundary}",
             "Origin": "https://api.slack.com",
-            "Cookie": f"{credentials['cookie']}",
+            "Cookie": credentials['cookie'],
         }
 
-        # Create the payload for the POST request body
+        # Overwrite payload for cookie-based authentication
         payload = (
             f"--{boundary}\r\n"
             f"Content-Disposition: form-data; name=\"token\"\r\n\r\n"
@@ -127,27 +162,24 @@ def make_slack_request(url, credentials, method="POST", payload=None, proxy=None
         )
 
     try:
+        # Choose POST or GET method based on input
         if method == "POST":
             response = requests.post(
-                url,
-                headers=headers,
-                data=payload,
-                proxies={'http': proxy, 'https': proxy},
+                url, headers=headers, data=payload, proxies={'http': proxy, 'https': proxy},
                 verify=verify_ssl
             )
         else:
-
             response = requests.get(
-                url,
-                headers=headers,
-                proxies={'http': proxy, 'https': proxy},
+                url, headers=headers, proxies={'http': proxy, 'https': proxy},
                 verify=verify_ssl
             )
 
+        # Check if the request was successful
         response.raise_for_status()
         data = response.json()
 
-        if not response.status_code == 200 and data.get("ok"):
+        # Additional check to handle Slack-specific errors
+        if response.status_code != 200 or not data.get("ok", False):
             print("Request failed.")
             print(f"Error message: {data.get('error', 'N/A')}")
 
@@ -180,6 +212,18 @@ def test_credentials(credentials, proxy, verify_ssl=False):
             print(json.dumps(response, indent=4))
 
 def list_channels(credentials, proxy, verify_ssl=False):
+    """
+    Lists all Slack channels in the workspace.
+
+    Args:
+        credentials (dict): A dictionary containing authentication credentials.
+        proxy (str): Optional proxy URL.
+        verify_ssl (bool): Whether to verify SSL certificates.
+
+    Returns:
+        list: A list of channels or None if the request fails.
+    """
+
     if 'token' in credentials:
         test_url = "https://slack.com/api/conversations.list"
         payload = None
@@ -277,7 +321,7 @@ def download_files(credentials, file_urls, output_directory=None, proxy=None, ve
             if output_directory:
                 filename = os.path.join(output_directory, filename)
 
-            with open(filename, "wb") as f:
+            with open(filename, "wb", encoding='utf-8') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             print(f"Downloaded: {filename}")
@@ -285,10 +329,18 @@ def download_files(credentials, file_urls, output_directory=None, proxy=None, ve
             print(f"Error downloading: {url}")
 
 def generate_unique_filename(url):
+    """
+    Generates a unique filename based on the URL and current timestamp.
+
+    Args:
+        url (str): The file URL.
+
+    Returns:
+        str: The generated unique filename.
+    """
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
     unique_id = hashlib.md5(url.encode()).hexdigest()[:4]
-    filename = f"{timestamp}_{unique_id}_{url.split('/')[-1]}"
-    return filename
+    return f"{timestamp}_{unique_id}_{url.split('/')[-1]}"
 
 def list_user_list(credentials, proxy=None, verify_ssl=False):
 
@@ -525,28 +577,37 @@ def pillage_conversations(credentials, proxy, verify_ssl=False):
             text = message.get('text', '')
             find_secrets_in_text(channel_name, channel_id, timestamp, sender_info, text)
 
-def retrieve_conversation_messages(credentials, conversation_id, proxy, verify_ssl=False):
+def retrieve_conversation_messages(credentials, conversation_id, proxy=None, verify_ssl=False):
+    """
+    Retrieves messages from a Slack conversation.
+
+    Args:
+        credentials (dict): Authentication credentials (either token or cookie).
+        conversation_id (str): The Slack conversation ID.
+        proxy (str): Optional proxy URL.
+        verify_ssl (bool): Whether to verify SSL certificates.
+
+    Returns:
+        list: List of messages from the conversation.
+    """
+    test_url = f"https://slack.com/api/conversations.history?channel={conversation_id}"
     if 'token' in credentials:
-        test_url = f"https://slack.com/api/conversations.history?channel={conversation_id}"
-        payload = None
-
-        response = make_slack_request(test_url, credentials, method="GET", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
-
+        response = make_slack_request(test_url, credentials, method="GET", proxy=proxy, verify_ssl=verify_ssl)
     elif 'cookie' in credentials:
-        user_session_token = make_cookie_request(credentials['workspace_url'], credentials['cookie'], proxy, verify_ssl)
+        user_session_token = make_cookie_request(
+            credentials['workspace_url'], credentials['cookie'], proxy, verify_ssl
+        )
         if not user_session_token:
             print("[ERROR]: Unable to obtain user session token.")
             return []
-
-        test_url = f"https://slack.com/api/conversations.history?channel={conversation_id}"
         payload = {"token": user_session_token}
         response = make_slack_request(test_url, credentials, method="POST", payload=payload, proxy=proxy, verify_ssl=verify_ssl)
 
     if response and response.get("ok"):
         return response.get("messages", [])
-    else:
-        print(f"Error retrieving messages for conversation {conversation_id}")
-        return []
+    print(f"Error retrieving messages for conversation {conversation_id}")
+    return []
+
 
 def find_secrets_in_text(channel_name, channel_id, timestamp, sender_info, text):
     # Hash the entire text to check for duplicates
@@ -609,7 +670,14 @@ def find_secrets_in_text(channel_name, channel_id, timestamp, sender_info, text)
         print(json.dumps(results, indent=2))
 
 def save_output_to_json(data, filename):
-    with open(filename, 'w') as json_file:
+    """
+    Saves the output data to a JSON file.
+
+    Args:
+        data (dict): The data to be saved.
+        filename (str): The file name for the output JSON file.
+    """
+    with open(filename, 'w', encoding='utf-8') as json_file:
         json.dump(data, json_file, indent=2)
 
 class ExamplesAction(argparse.Action):
@@ -675,21 +743,34 @@ def colorize_text_with_2d_gradient(text, width, height, colors):
     return colored_text + Style.RESET_ALL
 
 def print_banner(silence=False):
+    """
+    Prints a colored banner if not silenced.
+
+    Args:
+        silence (bool): If True, the banner will not be printed.
+    """
     if not silence:
         banner_text = get_main_banner()
         width = max(len(line) for line in banner_text.splitlines())
         height = len(banner_text.splitlines())
         colors = {
-            'top_left': (255, 0, 0),  # Light Blue JS: seems like bottom left
-            'top_right': (255, 165, 0), # Light Green JS: seems like bottom right
-            'bottom_left': (173, 216, 230),   # Red JS: seems like top left
-            'bottom_right': (144, 238, 144) # Light Orange JS: Seems like top right
+            'top_left': (255, 0, 0),
+            'top_right': (255, 165, 0),
+            'bottom_left': (173, 216, 230),
+            'bottom_right': (144, 238, 144)
         }
         colored_banner = colorize_text_with_2d_gradient(banner_text, width, height, colors)
         print(colored_banner)
 
+
 def get_main_banner():
-    return """
+    """
+    Returns the main banner text.
+
+    Returns:
+        str: The banner text.
+    """
+    return f"""
   █████████  ████                    █████           █████████   █████   █████                     █████
  ███░░░░░███░░███                   ░░███           ███░░░░░███ ░░███   ░░███                     ░░███
 ░███    ░░░  ░███   ██████    ██████ ░███ █████    ░███    ░███ ███████ ███████   ██████    ██████ ░███ █████
@@ -699,10 +780,9 @@ def get_main_banner():
 ░░█████████  █████░░████████░░██████ ████ █████    █████   █████ ░░█████ ░░█████░░████████░░██████ ████ █████
  ░░░░░░░░░  ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░    ░░░░░   ░░░░░   ░░░░░   ░░░░░  ░░░░░░░░  ░░░░░░ ░░░░ ░░░░░
 
-Slackattack v{version}
+Slackattack v{__version__}
 By: Jonathan Stines - @fr4nk3nst1ner
-""".format(version=__version__)
-
+"""
 
 def get_sub_banner():
     return """
@@ -893,4 +973,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
