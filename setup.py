@@ -1,19 +1,20 @@
 import os
 from setuptools import setup, find_packages
 
+# Read long description from README.md
 with open('README.md', 'r') as f:
     long_description = f.read()
 
+# Read the requirements from requirements.txt
 try:
     with open('requirements.txt', 'r') as f:
         requirements = f.read().splitlines() if os.path.exists('requirements.txt') else []
-
 except FileNotFoundError:
     requirements = []
 
-
+# Read the version from _version.py
 version = {}
-with open('_version.py') as f:
+with open('_version.py') as f: 
     exec(f.read(), version)
 
 setup(
@@ -25,11 +26,15 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/fr4nk3nst1ner/slackattack',
     packages=find_packages(),
+    include_package_data=True,  
+    package_data={
+        '': ['_version.py'], 
+    },
     install_requires=requirements,
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
-    scripts=['slackattack.py'],
+    scripts=['slackattack.py'], 
 )
