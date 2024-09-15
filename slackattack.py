@@ -252,8 +252,6 @@ def list_channels(credentials, proxy, verify_ssl=False):
             print("Error in make_slack_request")
             return None
 
-
-
 def list_file_urls(credentials, channel, proxy, verify_ssl=False):
 
     if 'token' in credentials:
