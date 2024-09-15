@@ -81,6 +81,8 @@ jobs:
         else
           echo "Tag ${{ env.VERSION }} does not exist."
           echo "tag_exists=false" >> $GITHUB_ENV
+        fi
+
 
     - name: Bump version and push to new branch
       if: env.tag_exists == 'false'
