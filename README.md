@@ -41,7 +41,13 @@ python3 slackattack.py  --examples
 
 ### From Pypi with Pip:
 
-`pip install slackattack`
+- When installed via Pypi, ensure you run `slackattack` without the `.py` extension 
+- It's created as a package, therefore has an entrypoint that points the python file rather than running directly from the python file
+
+```bash
+pip install slackattack
+slackattack --version
+```
 
 ### From Github  
 ```  
