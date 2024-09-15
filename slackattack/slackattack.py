@@ -11,7 +11,7 @@ from termcolor import colored
 import json
 from colorama import Style, init
 
-from _version import __version__ 
+from slackattack._version import __version__ 
 
 verbose = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

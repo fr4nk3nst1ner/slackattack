@@ -12,29 +12,30 @@ try:
 except FileNotFoundError:
     requirements = []
 
-# Read the version from _version.py
+# Read the version from slackattack/_version.py
 version = {}
-with open('_version.py') as f: 
+with open(os.path.join('slackattack', '_version.py')) as f:  
     exec(f.read(), version)
 
 setup(
     name='slackattack',
-    version=version['__version__'],
+    version=version['__version__'],  
     author='Jonathan Stines',
     description='Slack post-exploitation script for leaked bot tokens and "d" cookies',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/fr4nk3nst1ner/slackattack',
-    packages=find_packages(),
+    packages=find_packages(),  
     include_package_data=True,  
-    package_data={
-        '': ['_version.py'], 
-    },
     install_requires=requirements,
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
-    scripts=['slackattack.py'], 
+    entry_points={  
+        'console_scripts': [
+            'slackattack=slackattack.slackattack:main',  
+        ],
+    },
 )
