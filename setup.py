@@ -13,7 +13,7 @@ except FileNotFoundError:
 
 
 version = {}
-with open(os.path.join('slackattack', '_version.py')) as f:
+with open('_version.py') as f:
     exec(f.read(), version)
 
 setup(
