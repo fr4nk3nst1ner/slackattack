@@ -18,7 +18,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const version = "1.0.0"
+const version = "1.0.2"
 
 // Add RGB color struct and methods
 type RGB struct {

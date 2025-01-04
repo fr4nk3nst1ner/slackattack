@@ -2,4 +2,5 @@ venv/
 build/
 .DS_STORE
 downloaded_files/
-*.json  
+*.json
+slackattack
