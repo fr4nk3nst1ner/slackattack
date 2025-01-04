@@ -15,6 +15,8 @@ Slackattack can perform various enumeration tasks, such as dumping channel infor
 - **Get User List**: Retrieve a list of users in your Slack workspace.
 - **Pillage conversations**: Leverages detect-secrets libraries to automatically find secrets in files and conversations. 
 
+![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/banner.png)
+
 ```
 slackattack  --examples                                                       
 
@@ -34,8 +36,6 @@ slackattack  --examples
             slackattack --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --check-permissions
             slackattack --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --pillage
 ```
-
-![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/banner.png)
 
 ## Installation
 
