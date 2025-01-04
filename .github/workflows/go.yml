@@ -1,0 +1,117 @@
+name: Go Release
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        goos: [linux, linux, darwin, windows]
+        goarch: [amd64, arm64, arm64, amd64]
+        ext: [ "", "", "", ".exe" ]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Initialize Go module
+      run: |
+        go mod tidy
+
+    - name: Build binary
+      run: |
+        CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o slackattack-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+
+    - name: Archive binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: slackattack-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+        path: slackattack-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download Linux x64 binary
+      uses: actions/download-artifact@v3
+      with:
+        name: slackattack-linux-amd64
+        path: ./release-assets/
+
+    - name: Download Linux arm64 binary
+      uses: actions/download-artifact@v3
+      with:
+        name: slackattack-linux-arm64
+        path: ./release-assets/
+
+    - name: Download macOS arm64 binary
+      uses: actions/download-artifact@v3
+      with:
+        name: slackattack-darwin-arm64
+        path: ./release-assets/
+
+    - name: Download Windows x64 binary
+      uses: actions/download-artifact@v3
+      with:
+        name: slackattack-windows-amd64.exe
+        path: ./release-assets/
+
+    - name: List downloaded files
+      run: ls -al ./release-assets/
+
+    - name: Determine Next Version
+      id: next_version
+      run: |
+        # Fetch all tags from the remote
+        git fetch --tags
+
+        # Get the latest tag from the repository
+        CURRENT_VERSION=$(git describe --tags --abbrev=0 || echo "v0.0.0")
+        echo "Current Version: ${CURRENT_VERSION}"
+
+        # Strip the 'v' prefix and split the version number into its components
+        VERSION=${CURRENT_VERSION#v}
+        MAJOR=$(echo $VERSION | cut -d. -f1)
+        MINOR=$(echo $VERSION | cut -d. -f2)
+        PATCH=$(echo $VERSION | cut -d. -f3)
+
+        # Increment the patch version
+        PATCH=$((PATCH+1))
+        NEXT_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+
+        # Ensure the new tag doesn't exist
+        while git rev-parse --quiet "refs/tags/$NEXT_VERSION" >/dev/null; do
+            PATCH=$((PATCH+1))
+            NEXT_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+        done
+
+        echo "NEXT_VERSION=${NEXT_VERSION}" >> $GITHUB_ENV
+        echo "Next Version: ${NEXT_VERSION}"
+
+    - name: Create New Tag
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+      run: |
+        git config user.name "github-actions"
+        git config user.email "actions@github.com"
+        git tag ${{ env.NEXT_VERSION }}
+        git push origin ${{ env.NEXT_VERSION }}
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.NEXT_VERSION }}
+        release_name: "Release ${{ env.NEXT_VERSION }}"
+        files: ./release-assets/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

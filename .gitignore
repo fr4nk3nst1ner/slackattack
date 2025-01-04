@@ -1,8 +1,5 @@
 venv/
-slackattack.egg-info/
-dist/
 build/
-__pycache__/
 .DS_STORE
 downloaded_files/
-*.json
+*.json  

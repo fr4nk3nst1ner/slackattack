@@ -3,7 +3,7 @@
 
 ## Background
 
-Slackattack is a Python script designed to interact with Slack's API using a Slack token or cookie that you may obtain during an engagement. It supports Slack's new API authentication model, allowing you to demonstrate the risks associated with plaintext Slack bot tokens and achieve your objectives!
+Slackattack is a Go script designed to interact with Slack's API using a Slack token or cookie that you may obtain during an engagement. It supports Slack's new API authentication model, allowing you to demonstrate the risks associated with plaintext Slack bot tokens and achieve your objectives!
 
 ## Description
 
@@ -16,45 +16,42 @@ Slackattack can perform various enumeration tasks, such as dumping channel infor
 - **Pillage conversations**: Leverages detect-secrets libraries to automatically find secrets in files and conversations. 
 
 ```
-python3 slackattack.py  --examples                                                       
+slackattack  --examples                                                       
 
         Examples of usage:
 
         Using a Slack API token:
-            python slackattack.py --token xoxb-1234567890 --list-users
-            python slackattack.py --token xoxb-1234567890 --list-channels
-            python slackattack.py --token xoxb-1234567890 --test
-            python slackattack.py --token xoxb-1234567890 --check-permissions
-            python slackattack.py --token xoxb-1234567890 --pillage
+            slackattack --token xoxb-1234567890 --list-users
+            slackattack --token xoxb-1234567890 --list-channels
+            slackattack --token xoxb-1234567890 --test
+            slackattack --token xoxb-1234567890 --check-permissions
+            slackattack --token xoxb-1234567890 --pillage
         
         Using a user-supplied cookie:
-            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-users
-            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-channels
-            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --test
-            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --check-permissions
-            python slackattack.py --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --pillage
+            slackattack --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-users
+            slackattack --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --list-channels
+            slackattack --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --test
+            slackattack --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --check-permissions
+            slackattack --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --pillage
 ```
 
 ![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/banner.png)
 
 ## Installation
 
-### From Pypi with Pip:
-
-- When installed via Pypi, ensure you run `slackattack` without the `.py` extension 
-- It's created as a package, therefore has an entrypoint that points the python file rather than running directly from the python file
+### From Go Install:
 
 ```bash
-pip install slackattack
+go install github.com/fr4nk3nst1ner/slackattack@latest
 slackattack --version
 ```
 
 ### From Github  
-```  
+```bash
 git clone https://github.com/fr4nk3nst1ner/slackattack.git 
 cd slackattack
-pip3 install -r requirements.txt
-``` 
+go build -o slackattack main.go
+```
 
 ## Usage
 
@@ -73,7 +70,7 @@ You can use Slackattack with various command-line arguments to perform specific 
 Use the `--pillage` argument to scan conversations for secrets
 
 ```
-python3 slackattack.py --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com --pillage
+slackattack --cookie YOUR_COOKIE --workspace-url https://[workspace].slack.com --pillage
 ```
 
 ### Check the permissions and what you can do with your token or cookie
@@ -81,13 +78,13 @@ python3 slackattack.py --cookie YOUR_COOKIE --workspace-url https://[workspace].
 Use the `--check-permissions` argument to list permissions and return commands you can run:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --check-permissions
+slackattack --token YOUR_TOKEN --check-permissions
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --check-permissions
+slackattack --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --check-permissions
 ```
 
 ### Get Channel List
@@ -95,13 +92,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace
 Retrieve a list of channels in your Slack workspace:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-channels
+slackattack --token YOUR_TOKEN --list-channels
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-channels
+slackattack --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-channels
 ```
 
 ### Get File URLs
@@ -109,13 +106,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace
 Retrieve file URLs for a specific channel using the `--channel` argument:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID
+slackattack --token YOUR_TOKEN --list-file-urls --channel CHANNEL_ID
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-file-urls --channel CHANNEL_ID
+slackattack --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-file-urls --channel CHANNEL_ID
 ```
 
 ### Download Files
@@ -123,13 +120,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace
 Download files from Slack channels:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --download-files
+slackattack --token YOUR_TOKEN --download-files
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --download-files
+slackattack --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --download-files
 ```
 
 ![Alt Text](https://github.com/fr4nk3nst1ner/slackattack/blob/main/images/slack_cookie_demo.gif)
@@ -140,13 +137,13 @@ python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace
 Retrieve a list of users in your Slack workspace:
 
 ```
-python3 slackattack.py --token YOUR_TOKEN --list-users
+slackattack --token YOUR_TOKEN --list-users
 ```
 
 or
 
 ```
-python3 slackattack.py --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-users
+slackattack --cookie 'YOUR_COOKIE' --workspace-url https://[workspace].slack.com --list-users
 ```
 
 Replace `YOUR_TOKEN`, `YOUR_COOKIE`, and other placeholders with your actual Slack API token, cookie, and workspace when running the commands.
@@ -175,5 +172,5 @@ For more information on this, see [this](https://papermtn.co.uk/retrieving-and-u
 
 - [x]  Add functionality to return associated permissions for supplied token or cookie.
 - [x]  Add functionality to identify secrets or sensitive data from files or conversations (e.g., regex).
-- [ ]  Add support and distinguish usability from bot and user tokens.
+- [x]  Add support and distinguish usability from bot and user tokens.
 - [x]  Add functionality to support cookie auth.

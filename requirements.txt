@@ -1,5 +1,0 @@
-argparse
-requests
-datetime
-termcolor
-colorama
