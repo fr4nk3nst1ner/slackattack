@@ -1,0 +1,67 @@
+# Basic Authentication Tests
+go run main.go -nobanner -token $token -check-permissions
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -check-permissions
+
+# Channel Operations
+go run main.go -nobanner -token $token -list-channels
+go run main.go -nobanner -token $token -list-channels -o channels.json
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-channels
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-channels -o channels.json
+
+# Channel Membership
+go run main.go -nobanner -token $token -channel-membership
+go run main.go -nobanner -token $token -channel-membership -o membership.json
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -channel-membership
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -channel-membership -o membership.json
+
+# User Operations
+go run main.go -nobanner -token $token -list-users
+go run main.go -nobanner -token $token -list-users -o users.json
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-users
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-users -o users.json
+
+# File Operations
+go run main.go -nobanner -token $token -list-files
+go run main.go -nobanner -token $token -list-files -o files.json
+go run main.go -nobanner -token $token -download-files -output-directory ./downloads
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-files
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -download-files -output-directory ./downloads
+
+# Channel Message Dumping
+go run main.go -nobanner -token $token -dump-channel general
+go run main.go -nobanner -token $token -dump-channel general -o general_messages.json
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -dump-channel general
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -dump-channel general -o general_messages.json
+
+# DM Operations (Cookie Auth Only)
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-dm
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-dm -o dm_channels.json
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -dump-dm D04AS1BJ1D3
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -dump-dm D04AS1BJ1D3 -o dm_messages.json
+
+# Pillage Mode
+go run main.go -nobanner -token $token -pillage all
+go run main.go -nobanner -token $token -pillage all -o pillage_results.json
+go run main.go -nobanner -token $token -pillage general
+go run main.go -nobanner -token $token -pillage general -o general_pillage.json
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -pillage all
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -pillage general
+
+# With Proxy
+go run main.go -nobanner -token $token -list-channels -proxy http://127.0.0.1:8080
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-channels -proxy http://127.0.0.1:8080
+
+# Banner Control
+go run main.go -nobanner -token $token -list-channels -nobanner
+
+# Help and Examples
+go run main.go -nobanner -examples
+go run main.go -nobanner -h
+
+# Verbose Mode
+go run main.go -nobanner -token $token -list-channels -verbose
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -list-channels -verbose
+
+# Combined Operations
+go run main.go -nobanner -token $token -list-channels -list-users -list-files -o combined_output.json
+go run main.go -nobanner -cookie $cookie -workspace-url $workspace -channel-membership -list-dm -verbose -o full_audit.json

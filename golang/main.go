@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,10 +20,67 @@ import (
 
 const version = "1.0.0"
 
+// Add RGB color struct and methods
+type RGB struct {
+	R, G, B uint8
+}
+
+func (c RGB) Sprint(text string) string {
+	return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", c.R, c.G, c.B, text)
+}
+
+func newRGB(r, g, b uint8) RGB {
+	return RGB{R: r, G: g, B: b}
+}
+
+func (start RGB) Fade(pos, total float32, point float32, end RGB) RGB {
+	if total == 0 {
+		return start
+	}
+	
+	ratio := pos / total
+	if ratio > 1 {
+		ratio = 1
+	}
+	
+	// Calculate midpoint color
+	midR := float32(start.R) + (float32(end.R)-float32(start.R))*point/total
+	midG := float32(start.G) + (float32(end.G)-float32(start.G))*point/total
+	midB := float32(start.B) + (float32(end.B)-float32(start.B))*point/total
+	
+	// Calculate final color
+	r := uint8(float32(start.R) + (midR-float32(start.R))*ratio)
+	g := uint8(float32(start.G) + (midG-float32(start.G))*ratio)
+	b := uint8(float32(start.B) + (midB-float32(start.B))*ratio)
+	
+	return RGB{r, g, b}
+}
+
+// Add colorization function
+func colorizeText(text string) string {
+	source := rand.NewSource(time.Now().UnixNano())
+	random := rand.New(source)
+
+	startColor := newRGB(uint8(random.Intn(256)), uint8(random.Intn(256)), uint8(random.Intn(256)))
+	firstPoint := newRGB(uint8(random.Intn(256)), uint8(random.Intn(256)), uint8(random.Intn(256)))
+
+	strs := strings.Split(text, "")
+
+	var coloredText string
+	for i := 0; i < len(text); i++ {
+		if i < len(strs) {
+			coloredText += startColor.Fade(float32(i), float32(len(text)), float32(i%(len(text)/2)), firstPoint).Sprint(strs[i])
+		}
+	}
+
+	return coloredText
+}
+
 func printBanner(silence bool) {
 	if !silence {
 		banner := getBanner()
-		fmt.Println(banner)
+		coloredBanner := colorizeText(banner)
+		fmt.Println(coloredBanner)
 	}
 }
 
@@ -159,39 +217,27 @@ func makeSlackRequest(urlStr string, credentials map[string]string, method strin
 		if token, ok := credentials["token"]; ok {
 			headers.Set("Authorization", "Bearer "+token)
 		} else if cookie, ok := credentials["cookie"]; ok {
-			// Use cookie-based authentication if token is not provided
+			// Get user session token
 			userSessionToken, err := makeCookieRequest(credentials["workspace_url"], cookie, proxyURL)
 			if err != nil {
 				return nil, fmt.Errorf("unable to obtain user session token: %v", err)
 			}
 
-			// Generate boundary exactly like Python
-			boundary := "----WebKitFormBoundary" + strings.ReplaceAll(uuid.New().String(), "-", "")
-
-			// Set headers exactly like Python requests
-			headers.Set("User-Agent", "python-requests/2.32.3")
-			headers.Set("Accept-Encoding", "gzip, deflate, br")
-			headers.Set("Accept", "*/*")
-			headers.Set("Content-Type", fmt.Sprintf("multipart/form-data; boundary=%s", boundary))
-			headers.Set("Origin", "https://api.slack.com")
-			headers.Set("Cookie", "d="+cookie)
-			headers.Set("Host", "slack.com")
-			headers.Set("Connection", "keep-alive")
-
-			// For files.list endpoint, add specific parameters
-			if strings.Contains(urlStr, "files.list") {
-				// Add query parameters to match Python version
-				if !strings.Contains(urlStr, "?") {
-					urlStr += "?"
-				} else {
-					urlStr += "&"
-				}
-				urlStr += "ts_from=0&ts_to=now&types=all&count=1000"
+			// For conversations.list, we need different handling
+			if strings.Contains(urlStr, "conversations.list") {
+				headers.Set("Authorization", "Bearer "+userSessionToken)
+				headers.Set("Cookie", "d="+cookie)
+				// Use application/x-www-form-urlencoded for this endpoint
+				headers.Set("Content-Type", "application/x-www-form-urlencoded")
+				payload = "token=" + userSessionToken
+			} else {
+				// Original multipart handling for other endpoints
+				boundary := "----WebKitFormBoundary" + strings.ReplaceAll(uuid.New().String(), "-", "")
+				headers.Set("Content-Type", fmt.Sprintf("multipart/form-data; boundary=%s", boundary))
+				headers.Set("Cookie", "d="+cookie)
+				payload = fmt.Sprintf("--%s\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\n%s\r\n--%s--\r\n",
+					boundary, userSessionToken, boundary)
 			}
-
-			// Create form data payload exactly like Python
-			payload = fmt.Sprintf("--%s\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\n%s\r\n--%s--\r\n",
-				boundary, userSessionToken, boundary)
 		}
 
 		transport := &http.Transport{
@@ -1206,15 +1252,333 @@ func dumpDMChannel(credentials map[string]string, proxyURL string, channelID str
 	return nil
 }
 
+func dumpChannelMessages(credentials map[string]string, proxyURL string, channelName string, outputJSON string) error {
+	// First get channel ID from name
+	channels, err := listChannels(credentials, proxyURL)
+	if err != nil {
+		return fmt.Errorf("failed to list channels: %v", err)
+	}
+
+	// Look for channel match
+	var channelID string
+	for _, channel := range channels {
+		if name, ok := channel["name"].(string); ok && name == channelName {
+			channelID = channel["id"].(string)
+			break
+		}
+	}
+
+	if channelID == "" {
+		return fmt.Errorf("channel '%s' not found", channelName)
+	}
+
+	// Get channel history
+	var allMessages []map[string]interface{}
+	cursor := ""
+	for {
+		historyURL := fmt.Sprintf("https://slack.com/api/conversations.history?channel=%s&limit=1000", channelID)
+		if cursor != "" {
+			historyURL += "&cursor=" + cursor
+		}
+
+		result, err := makeSlackRequest(
+			historyURL,
+			credentials,
+			"POST",
+			"",
+			proxyURL,
+			false,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get messages: %v", err)
+		}
+
+		messages, ok := result["messages"].([]interface{})
+		if !ok {
+			break
+		}
+
+		for _, msg := range messages {
+			if msgMap, ok := msg.(map[string]interface{}); ok {
+				// Convert timestamp
+				if ts, ok := msgMap["ts"].(string); ok {
+					if tsFloat, err := strconv.ParseFloat(ts, 64); err == nil {
+						msgMap["timestamp"] = time.Unix(int64(tsFloat), 0).Format("2006-01-02 15:04:05")
+					}
+				}
+				allMessages = append(allMessages, msgMap)
+			}
+		}
+
+		// Handle pagination
+		hasMore, _ := result["has_more"].(bool)
+		if !hasMore {
+			break
+		}
+
+		if metadata, ok := result["response_metadata"].(map[string]interface{}); ok {
+			if nextCursor, ok := metadata["next_cursor"].(string); ok && nextCursor != "" {
+				cursor = nextCursor
+			} else {
+				break
+			}
+		} else {
+			break
+		}
+	}
+
+	if outputJSON != "" {
+		jsonData, err := json.MarshalIndent(allMessages, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %v", err)
+		}
+		if err := os.WriteFile(outputJSON, jsonData, 0644); err != nil {
+			return fmt.Errorf("failed to write JSON file: %v", err)
+		}
+	} else {
+		fmt.Printf("\nMessages from #%s:\n", channelName)
+		for _, msg := range allMessages {
+			fmt.Printf("\n[%s] ", msg["timestamp"])
+			if user, ok := msg["user"].(string); ok {
+				fmt.Printf("<%s> ", user)
+			}
+			if text, ok := msg["text"].(string); ok {
+				fmt.Println(text)
+			}
+			// Print attachments and files
+			if attachments, ok := msg["attachments"].([]interface{}); ok {
+				for _, att := range attachments {
+					if attMap, ok := att.(map[string]interface{}); ok {
+						if text, ok := attMap["text"].(string); ok {
+							fmt.Printf("Attachment: %s\n", text)
+						}
+					}
+				}
+			}
+			if files, ok := msg["files"].([]interface{}); ok {
+				for _, file := range files {
+					if fileMap, ok := file.(map[string]interface{}); ok {
+						if name, ok := fileMap["name"].(string); ok {
+							if url, ok := fileMap["url_private"].(string); ok {
+								fmt.Printf("File: %s (%s)\n", name, url)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// Define the structs separately for clarity
+type Channel struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	MemberCount int      `json:"member_count"`
+	Members     []string `json:"members,omitempty"`
+}
+
+type DirectMessage struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+}
+
+type MembershipInfo struct {
+	Channels       []Channel       `json:"channels"`
+	DirectMessages []DirectMessage `json:"direct_messages"`
+}
+
+func listChannelMembership(credentials map[string]string, proxyURL string, outputJSON string) error {
+	// Get all channels
+	channels, err := listChannels(credentials, proxyURL)
+	if err != nil {
+		return fmt.Errorf("failed to list channels: %v", err)
+	}
+
+	// Structure to hold membership info
+	info := MembershipInfo{
+		Channels:       make([]Channel, 0),
+		DirectMessages: make([]DirectMessage, 0),
+	}
+
+	// If using token, only show channels the bot has access to
+	if _, isToken := credentials["token"]; isToken {
+		fmt.Println("\nBot Installation Channels:")
+		for _, channel := range channels {
+			channelID := channel["id"].(string)
+			channelName, _ := channel["name"].(string)
+			memberCount := 0
+			if count, ok := channel["num_members"].(float64); ok {
+				memberCount = int(count)
+			}
+
+			// If we can see the channel in conversations.list, we have some level of access
+			info.Channels = append(info.Channels, Channel{
+				ID:          channelID,
+				Name:        channelName,
+				MemberCount: memberCount,
+			})
+		}
+	} else {
+		// Using cookie auth - get full membership info
+		// ... existing DM and full membership code ...
+		result, err := makeSlackRequest(
+			"https://slack.com/api/client.userBoot",
+			credentials,
+			"POST",
+			"",
+			proxyURL,
+			false,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get DM channels: %v", err)
+		}
+
+		// Get users for looking up names
+		usersResult, err := makeSlackRequest(
+			"https://slack.com/api/users.list",
+			credentials,
+			"POST",
+			"",
+			proxyURL,
+			false,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to list users: %v", err)
+		}
+
+		// Build user ID to name map
+		userMap := make(map[string]string)
+		if users, ok := usersResult["members"].([]interface{}); ok {
+			for _, user := range users {
+				if userObj, ok := user.(map[string]interface{}); ok {
+					if id, ok := userObj["id"].(string); ok {
+						if name, ok := userObj["name"].(string); ok {
+							userMap[id] = name
+						}
+					}
+				}
+			}
+		}
+
+		// Get channel membership
+		for _, channel := range channels {
+			channelID := channel["id"].(string)
+			channelName, _ := channel["name"].(string)
+			memberCount := 0
+			if count, ok := channel["num_members"].(float64); ok {
+				memberCount = int(count)
+			}
+
+			// Get channel members
+			membersResult, err := makeSlackRequest(
+				fmt.Sprintf("https://slack.com/api/conversations.members?channel=%s", channelID),
+				credentials,
+				"GET",
+				"",
+				proxyURL,
+				false,
+			)
+			
+			var memberNames []string
+			if err == nil {
+				if members, ok := membersResult["members"].([]interface{}); ok {
+					for _, member := range members {
+						if memberID, ok := member.(string); ok {
+							if username, exists := userMap[memberID]; exists {
+								memberNames = append(memberNames, username)
+							}
+						}
+					}
+				}
+			}
+
+			info.Channels = append(info.Channels, Channel{
+				ID:          channelID,
+				Name:        channelName,
+				MemberCount: memberCount,
+				Members:     memberNames,
+			})
+		}
+
+		// Get DM channels
+		if openChannels, ok := result["is_open"].([]interface{}); ok {
+			for _, channelID := range openChannels {
+				if dmID, ok := channelID.(string); ok {
+					if strings.HasPrefix(dmID, "D") {
+						info.DirectMessages = append(info.DirectMessages, DirectMessage{
+							ID:       dmID,
+							Username: "N/A", // DMs not accessible with bot token
+						})
+					}
+				}
+			}
+		}
+	}
+
+	if outputJSON != "" {
+		jsonData, err := json.MarshalIndent(info, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %v", err)
+		}
+		if err := os.WriteFile(outputJSON, jsonData, 0644); err != nil {
+			return fmt.Errorf("failed to write JSON file: %v", err)
+		}
+	} else {
+		fmt.Println("\nChannel Access:")
+		for _, channel := range info.Channels {
+			fmt.Printf("\nChannel: #%s (%s)\n", channel.Name, channel.ID)
+			fmt.Printf("Member Count: %d\n", channel.MemberCount)
+			if len(channel.Members) > 0 {
+				fmt.Printf("Members: %s\n", strings.Join(channel.Members, ", "))
+			}
+			fmt.Println(strings.Repeat("-", 40))
+		}
+
+		// Only show DM channels for cookie auth
+		if _, isToken := credentials["token"]; !isToken {
+			fmt.Println("\nDirect Message Channels:")
+			for _, dm := range info.DirectMessages {
+				fmt.Printf("DM Channel ID: %s\n", dm.ID)
+			}
+		}
+	}
+
+	return nil
+}
+
 func init() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\nArguments:\n")
-		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nUsage: %s [options] <action>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nAuthentication (required):\n")
+		fmt.Fprintf(os.Stderr, "  -token string\n\tSlack API token (xoxb-*)\n")
+		fmt.Fprintf(os.Stderr, "  -cookie string\n\tSlack cookie (xoxd-*)\n")
+		fmt.Fprintf(os.Stderr, "  -workspace-url string\n\tWorkspace URL (required when using cookie)\n")
+		
+		fmt.Fprintf(os.Stderr, "\nActions:\n")
+		fmt.Fprintf(os.Stderr, "  -list-channels\tList all accessible channels\n")
+		fmt.Fprintf(os.Stderr, "  -list-users\tList all workspace users\n")
+		fmt.Fprintf(os.Stderr, "  -list-files\tList all accessible files\n")
+		fmt.Fprintf(os.Stderr, "  -list-dm\tList all DM channels\n")
+		fmt.Fprintf(os.Stderr, "  -dump-channel string\n\tDump messages from specified channel\n")
+		fmt.Fprintf(os.Stderr, "  -dump-dm string\n\tDump messages from specified DM channel\n")
+		fmt.Fprintf(os.Stderr, "  -channel-membership\n\tShow channel membership info\n")
+		fmt.Fprintf(os.Stderr, "  -pillage string\n\tSearch for secrets (specify channel or 'all')\n")
+		
+		fmt.Fprintf(os.Stderr, "\nOptions:\n")
+		fmt.Fprintf(os.Stderr, "  -proxy string\n\tProxy URL (optional)\n")
+		fmt.Fprintf(os.Stderr, "  -o, -output-json string\n\tSave output as JSON\n")
+		fmt.Fprintf(os.Stderr, "  -nobanner\tDisable banner output\n")
+		fmt.Fprintf(os.Stderr, "  -examples\tShow detailed usage examples\n")
+		fmt.Fprintf(os.Stderr, "  -verbose\tEnable verbose logging\n")
+		
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s --token xoxb-1234-5678 --check-permissions\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --check-permissions\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s --cookie xoxd-abcdefghijklmn --workspace-url https://your-workspace.slack.com --pillage\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -token xoxb-1234 -list-channels\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -cookie xoxd-5678 -workspace-url slack.company.com -pillage all\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -examples\t(show more detailed examples)\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\n")
 	}
 }
 
@@ -1234,10 +1598,12 @@ func main() {
 	var listFilesFlag bool
 	var dumpLogs bool
 	var verbose bool
-	var dumpMessagesChannel string
+	var dumpChannelName string
 	var noBanner bool
 	var listDMs bool
 	var dumpDMChannelID string
+	var showChannelMembership bool
+	var showExamples bool
 
 	// Define flags to match Python's argparse options
 	flag.StringVar(&token, "token", "", "Slack API token")
@@ -1255,22 +1621,38 @@ func main() {
 	flag.BoolVar(&listFilesFlag, "list-files", false, "List all files from all channels")
 	flag.BoolVar(&dumpLogs, "dump-logs", false, "Dump team access logs")
 	flag.BoolVar(&verbose, "verbose", false, "Enable verbose logging for troubleshooting")
-	flag.StringVar(&dumpMessagesChannel, "dump-messages", "", "Dump messages from specified channel or username (for DMs)")
+	flag.StringVar(&dumpChannelName, "dump-channel", "", "Dump messages from specified channel name")
 	flag.BoolVar(&noBanner, "nobanner", false, "Disable banner output")
 	flag.BoolVar(&listDMs, "list-dm", false, "List all DM channels")
 	flag.StringVar(&dumpDMChannelID, "dump-dm", "", "Dump messages from specified DM channel ID (e.g., D04ES1BJ1E3)")
+	flag.BoolVar(&showChannelMembership, "channel-membership", false, "List channel membership and open DM channels")
+	flag.BoolVar(&showExamples, "examples", false, "Show detailed examples for all commands")
 
 	// Add short versions of flags
 	flag.StringVar(&outputJSON, "o", "", "Short for --output-json")
 	flag.StringVar(&proxyURL, "p", "", "Short for --proxy")
 	flag.BoolVar(&verbose, "v", false, "Short for --verbose")
 
-	// Print banner before parsing flags
-	printBanner(!noBanner)
+	// Print banner if no args provided or -nobanner not specified
+	if len(os.Args) == 1 || (!contains(os.Args, "-nobanner") && !contains(os.Args, "--nobanner")) {		printBanner(false)
+	}
 
+	// Parse flags after banner
 	flag.Parse()
 
-	// Validate required arguments
+	// Show help and return if no args provided
+	if len(os.Args) == 1 {
+		flag.Usage()
+		return
+	}
+
+	// Handle examples before other validation
+	if showExamples {
+		showUsageExamples()
+		return
+	}
+
+	// Now do validation for other commands
 	if token == "" && cookie == "" {
 		log.Fatal("Either token or cookie must be provided")
 	}
@@ -1281,8 +1663,9 @@ func main() {
 
 	// Validate that at least one action is specified
 	if !test && !listUsers && !listChannels && !checkPerms && !listFilesFlag && 
-	   !downloadFilesFlag && !dumpLogs && pillageTarget == "" && dumpMessagesChannel == "" && 
-	   !listDMs && dumpDMChannelID == "" {
+	   !downloadFilesFlag && !dumpLogs && pillageTarget == "" && 
+	   dumpChannelName == "" && !listDMs && dumpDMChannelID == "" && 
+	   !showChannelMembership {
 		log.Fatal("At least one action must be specified")
 	}
 
@@ -1369,7 +1752,7 @@ func main() {
 	}
 
 	// Add dump-messages handling
-	if dumpMessagesChannel != "" {
+	if dumpChannelName != "" {
 		credentials := make(map[string]string)
 		if token != "" {
 			credentials["token"] = token
@@ -1378,7 +1761,7 @@ func main() {
 			credentials["workspace_url"] = workspaceURL
 		}
 
-		if err := dumpMessages(credentials, proxyURL, dumpMessagesChannel, outputJSON); err != nil {
+		if err := dumpChannelMessages(credentials, proxyURL, dumpChannelName, outputJSON); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -1413,5 +1796,119 @@ func main() {
 		}
 	}
 
-	// TODO: Implement other actions (test, listUsers, listChannels, etc.)
+	// Add show-channel-membership handling
+	if showChannelMembership {
+		credentials := make(map[string]string)
+		if token != "" {
+			credentials["token"] = token
+		} else if cookie != "" {
+			credentials["cookie"] = cookie
+			credentials["workspace_url"] = workspaceURL
+		}
+
+		if err := listChannelMembership(credentials, proxyURL, outputJSON); err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func showUsageExamples() {
+	examples := `
+Slackattack Usage Examples
+=========================
+
+Authentication Options:
+---------------------
+1. Using Bot Token:
+   $ slackattack -token xoxb-your-token -check-permissions
+   Returns: List of permissions the bot token has access to
+
+2. Using Cookie:
+   $ slackattack -cookie "xoxd-your-cookie" --workspace-url https://yourworkspace.slack.com -check-permissions
+   Returns: List of permissions the authenticated user has access to
+
+Channel Operations:
+-----------------
+1. List All Channels:
+   $ slackattack -token $token -list-channels
+   Returns: List of all visible channels with their IDs and names
+
+2. Dump Channel Messages:
+   $ slackattack -token $token -dump-channel general
+   Returns: All messages from the specified channel
+
+3. Show Channel Membership:
+   $ slackattack -token $token -channel-membership
+   Returns: List of channels the bot has access to
+   
+   $ slackattack -cookie $cookie --workspace-url $workspace -channel-membership
+   Returns: Full channel membership info and DM channels
+
+DM Operations:
+------------
+1. List DM Channels:
+   $ slackattack -cookie $cookie --workspace-url $workspace -list-dm
+   Returns: List of all open DM channel IDs
+
+2. Dump DM Messages:
+   $ slackattack -cookie $cookie --workspace-url $workspace -dump-dm D04ES1BJ1E3
+   Returns: All messages from the specified DM channel
+
+File Operations:
+--------------
+1. List Files:
+   $ slackattack -token $token -list-files
+   Returns: URLs of all accessible files
+
+2. Download Files:
+   $ slackattack -token $token -download-files -output-directory ./downloads
+   Action: Downloads all accessible files to specified directory
+
+Security Operations:
+-----------------
+1. Pillage Mode:
+   $ slackattack -token $token -pillage all
+   Returns: Scans all accessible channels for sensitive information
+
+   $ slackattack -token $token -pillage general
+   Returns: Scans specific channel for sensitive information
+
+User Operations:
+--------------
+1. List Users:
+   $ slackattack -token $token -list-users
+   Returns: List of all workspace users with their IDs and names
+
+Output Options:
+-------------
+1. JSON Output:
+   Add -o output.json to any command to save results in JSON format
+   Example: $ slackattack -token $token -list-channels -o channels.json
+
+2. Proxy Support:
+   Add -proxy http://127.0.0.1:8080 to route traffic through a proxy
+   Example: $ slackattack -token $token -list-channels -proxy http://127.0.0.1:8080
+
+3. Disable Banner:
+   Add -nobanner to suppress the ASCII art banner
+   Example: $ slackattack -token $token -list-channels -nobanner
+
+Notes:
+-----
+- Bot tokens (xoxb-*) have limited access compared to user cookies
+- Some operations (like DM access) require cookie authentication
+- Use -verbose flag for detailed error messages and debugging
+- All commands support JSON output with -o flag
+`
+	fmt.Println(examples)
+}
+
+// Add helper function to check args
+func contains(slice []string, str string) bool {
+	for _, v := range slice {
+		if v == str {
+			return true
+		}
+	}
+	return false
 } 
