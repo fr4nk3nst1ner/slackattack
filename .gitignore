@@ -4,3 +4,4 @@ build/
 downloaded_files/
 *.json
 slackattack
+out
