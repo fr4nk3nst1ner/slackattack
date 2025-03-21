@@ -42,7 +42,7 @@ func (c *Client) CheckPermissions() error {
 // DumpChannelMessages dumps all messages from a specific channel
 func (c *Client) DumpChannelMessages(channelName string, outputJSON string) error {
 	// First get channel ID
-	result, err := c.makeRequest("https://slack.com/api/conversations.list", "POST", "")
+	result, err := c.makeRequest("https://slack.com/api/conversations.list?types=public_channel,private_channel", "POST", "")
 	if err != nil {
 		return fmt.Errorf("failed to list channels: %v", err)
 	}
@@ -149,8 +149,8 @@ func (c *Client) ListDMChannels(outputJSON string) error {
 	for _, ch := range channels {
 		if channelMap, ok := ch.(map[string]interface{}); ok {
 			dm := map[string]string{
-				"ID":       getString(channelMap, "id"),
-				"User ID":  getString(channelMap, "user"),
+				"ID":      getString(channelMap, "id"),
+				"User ID": getString(channelMap, "user"),
 				"Created": formatTimestamp(getInt64(channelMap, "created")),
 			}
 			dmList = append(dmList, dm)
@@ -243,7 +243,7 @@ func (c *Client) DumpDMMessages(channelID string, outputJSON string) error {
 
 // ListChannelMembership lists channel membership information
 func (c *Client) ListChannelMembership(outputJSON string) error {
-	result, err := c.makeRequest("https://slack.com/api/conversations.list", "POST", "")
+	result, err := c.makeRequest("https://slack.com/api/conversations.list?types=public_channel,private_channel", "POST", "")
 	if err != nil {
 		return fmt.Errorf("failed to list channels: %v", err)
 	}
@@ -265,14 +265,14 @@ func (c *Client) ListChannelMembership(outputJSON string) error {
 	for _, ch := range channels {
 		if channelMap, ok := ch.(map[string]interface{}); ok {
 			channelID := getString(channelMap, "id")
-			
+
 			// Get channel members
 			membersResult, err := c.makeRequest(
 				fmt.Sprintf("https://slack.com/api/conversations.members?channel=%s", channelID),
 				"GET",
 				"",
 			)
-			
+
 			var members []string
 			if err == nil {
 				if membersList, ok := membersResult["members"].([]interface{}); ok {
@@ -347,4 +347,4 @@ func (c *Client) DumpTeamAccessLogs(outputJSON string) error {
 	}
 
 	return nil
-} 
+}

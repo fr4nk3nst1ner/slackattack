@@ -12,7 +12,7 @@ import (
 
 // ListChannels lists all accessible channels
 func (c *Client) ListChannels(outputJSON string) error {
-	result, err := c.makeRequest("https://slack.com/api/conversations.list", "POST", "")
+	result, err := c.makeRequest("https://slack.com/api/conversations.list?types=public_channel,private_channel", "POST", "")
 	if err != nil {
 		return fmt.Errorf("failed to list channels: %v", err)
 	}
@@ -71,13 +71,13 @@ func (c *Client) ListUsers(outputJSON string) error {
 	for _, user := range users {
 		if userMap, ok := user.(map[string]interface{}); ok {
 			profile, _ := userMap["profile"].(map[string]interface{})
-			
+
 			formattedUser := map[string]string{
 				"User ID":          getString(userMap, "id"),
 				"Username":         getString(userMap, "name"),
 				"Real Name":        getString(userMap, "real_name"),
 				"Display Name":     getString(profile, "display_name"),
-				"Email":           getString(profile, "email"),
+				"Email":            getString(profile, "email"),
 				"Is Admin":         formatBool(getBool(userMap, "is_admin")),
 				"Is Owner":         formatBool(getBool(userMap, "is_owner")),
 				"Is Primary Owner": formatBool(getBool(userMap, "is_primary_owner")),
@@ -151,7 +151,7 @@ func (c *Client) Pillage(channelName string, outputJSON string) error {
 	// First get channel ID if not "all"
 	var channelsToScan []string
 	if channelName != "all" {
-		result, err := c.makeRequest("https://slack.com/api/conversations.list", "POST", "")
+		result, err := c.makeRequest("https://slack.com/api/conversations.list?types=public_channel,private_channel", "POST", "")
 		if err != nil {
 			return fmt.Errorf("failed to list channels: %v", err)
 		}
@@ -177,7 +177,7 @@ func (c *Client) Pillage(channelName string, outputJSON string) error {
 		}
 	} else {
 		// Get all channel IDs
-		result, err := c.makeRequest("https://slack.com/api/conversations.list", "POST", "")
+		result, err := c.makeRequest("https://slack.com/api/conversations.list?types=public_channel,private_channel", "POST", "")
 		if err != nil {
 			return fmt.Errorf("failed to list channels: %v", err)
 		}
@@ -293,4 +293,4 @@ func writeJSON(filename string, data interface{}) error {
 	}
 
 	return nil
-} 
+}
