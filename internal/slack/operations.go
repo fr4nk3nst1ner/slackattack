@@ -12,46 +12,62 @@ import (
 
 // ListChannels lists all accessible channels
 func (c *Client) ListChannels(outputJSON string) error {
-	result, err := c.makeRequest("https://slack.com/api/conversations.list", "POST", "")
-	if err != nil {
-		return fmt.Errorf("failed to list channels: %v", err)
-	}
+	cursor := ""
+	for {
+		var queryParam string
+		if cursor != "" {
+			queryParam = "?types=public_channel,private_channel,mpim,im&cursor=" + cursor
+		}
+		result, err := c.makeRequest("https://slack.com/api/conversations.list"+queryParam, "POST", "")
+		if err != nil {
+			return fmt.Errorf("failed to list channels: %v", err)
+		}
 
-	channels, ok := result["channels"].([]interface{})
-	if !ok {
-		return fmt.Errorf("no channels found in response")
-	}
+		channels, ok := result["channels"].([]interface{})
+		if !ok {
+			return fmt.Errorf("no channels found in response")
+		}
 
-	var channelList []models.Channel
-	for _, ch := range channels {
-		if channelMap, ok := ch.(map[string]interface{}); ok {
-			channel := models.Channel{
-				ID:          getString(channelMap, "id"),
-				Name:        getString(channelMap, "name"),
-				MemberCount: getInt(channelMap, "num_members"),
-				Created:     getInt64(channelMap, "created"),
-				Creator:     getString(channelMap, "creator"),
-				IsMember:    getBool(channelMap, "is_member"),
+		var channelList []models.Channel
+		for _, ch := range channels {
+			if channelMap, ok := ch.(map[string]interface{}); ok {
+				channel := models.Channel{
+					ID:          getString(channelMap, "id"),
+					Name:        getString(channelMap, "name"),
+					MemberCount: getInt(channelMap, "num_members"),
+					Created:     getInt64(channelMap, "created"),
+					Creator:     getString(channelMap, "creator"),
+					IsMember:    getBool(channelMap, "is_member"),
+				}
+				channelList = append(channelList, channel)
 			}
-			channelList = append(channelList, channel)
+		}
+
+		if outputJSON != "" {
+			return writeJSON(outputJSON, channelList)
+		}
+
+		// Print to stdout
+		fmt.Println("\nList of Channels:")
+		for _, channel := range channelList {
+			fmt.Printf("\nChannel Details:\n")
+			fmt.Printf("  Name: %s\n", channel.Name)
+			fmt.Printf("  ID: %s\n", channel.ID)
+			fmt.Printf("  Member Count: %d\n", channel.MemberCount)
+			fmt.Printf("  Creator: %s\n", channel.Creator)
+			fmt.Printf("  Is Member: %v\n", channel.IsMember)
+		}
+		//Handle pagination
+		if metadata, ok := result["response_metadata"].(map[string]interface{}); ok {
+			if nextCursor, ok := metadata["next_cursor"].(string); ok && nextCursor != "" {
+				cursor = nextCursor
+			} else {
+				break
+			}
+		} else {
+			break
 		}
 	}
-
-	if outputJSON != "" {
-		return writeJSON(outputJSON, channelList)
-	}
-
-	// Print to stdout
-	fmt.Println("\nList of Channels:")
-	for _, channel := range channelList {
-		fmt.Printf("\nChannel Details:\n")
-		fmt.Printf("  Name: %s\n", channel.Name)
-		fmt.Printf("  ID: %s\n", channel.ID)
-		fmt.Printf("  Member Count: %d\n", channel.MemberCount)
-		fmt.Printf("  Creator: %s\n", channel.Creator)
-		fmt.Printf("  Is Member: %v\n", channel.IsMember)
-	}
-
 	return nil
 }
 
@@ -71,13 +87,13 @@ func (c *Client) ListUsers(outputJSON string) error {
 	for _, user := range users {
 		if userMap, ok := user.(map[string]interface{}); ok {
 			profile, _ := userMap["profile"].(map[string]interface{})
-			
+
 			formattedUser := map[string]string{
 				"User ID":          getString(userMap, "id"),
 				"Username":         getString(userMap, "name"),
 				"Real Name":        getString(userMap, "real_name"),
 				"Display Name":     getString(profile, "display_name"),
-				"Email":           getString(profile, "email"),
+				"Email":            getString(profile, "email"),
 				"Is Admin":         formatBool(getBool(userMap, "is_admin")),
 				"Is Owner":         formatBool(getBool(userMap, "is_owner")),
 				"Is Primary Owner": formatBool(getBool(userMap, "is_primary_owner")),
@@ -293,4 +309,4 @@ func writeJSON(filename string, data interface{}) error {
 	}
 
 	return nil
-} 
+}

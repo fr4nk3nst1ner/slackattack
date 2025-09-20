@@ -42,37 +42,56 @@ func (c *Client) CheckPermissions() error {
 // DumpChannelMessages dumps all messages from a specific channel
 func (c *Client) DumpChannelMessages(channelName string, outputJSON string) error {
 	// First get channel ID
-	result, err := c.makeRequest("https://slack.com/api/conversations.list", "POST", "")
-	if err != nil {
-		return fmt.Errorf("failed to list channels: %v", err)
-	}
-
-	channels, ok := result["channels"].([]interface{})
-	if !ok {
-		return fmt.Errorf("no channels found")
-	}
-
+	channelCursor := ""
 	var channelID string
-	for _, ch := range channels {
-		if channelMap, ok := ch.(map[string]interface{}); ok {
-			if getString(channelMap, "name") == channelName {
-				channelID = getString(channelMap, "id")
-				break
+	channelFound := false
+	for !channelFound {
+
+		var queryParam string
+		if channelCursor != "" {
+			queryParam = "?types=public_channel,private_channel,mpim,im&cursor=" + channelCursor
+		}
+		result, err := c.makeRequest("https://slack.com/api/conversations.list"+queryParam, "GET", "")
+		if err != nil {
+			return fmt.Errorf("failed to list channels: %v", err)
+		}
+
+		channels, ok := result["channels"].([]interface{})
+		if !ok {
+			return fmt.Errorf("no channels found")
+		}
+
+		for _, ch := range channels {
+			if channelMap, ok := ch.(map[string]interface{}); ok {
+				if getString(channelMap, "name") == channelName {
+					channelID = getString(channelMap, "id")
+					channelFound = true
+					break
+				}
 			}
 		}
-	}
 
-	if channelID == "" {
+		if metadata, ok := result["response_metadata"].(map[string]interface{}); ok {
+			if nextCursor, ok := metadata["next_cursor"].(string); ok && nextCursor != "" {
+				channelCursor = nextCursor
+			} else {
+				break
+			}
+		} else {
+			break
+		}
+	}
+	if !channelFound {
 		return fmt.Errorf("channel '%s' not found", channelName)
 	}
 
 	// Get channel history
 	var allMessages []map[string]interface{}
-	cursor := ""
+	messageCursor := ""
 	for {
 		historyURL := fmt.Sprintf("https://slack.com/api/conversations.history?channel=%s&limit=1000", channelID)
-		if cursor != "" {
-			historyURL += "&cursor=" + cursor
+		if messageCursor != "" {
+			historyURL += "&cursor=" + messageCursor
 		}
 
 		result, err := c.makeRequest(historyURL, "POST", "")
@@ -98,14 +117,9 @@ func (c *Client) DumpChannelMessages(channelName string, outputJSON string) erro
 		}
 
 		// Handle pagination
-		hasMore, _ := result["has_more"].(bool)
-		if !hasMore {
-			break
-		}
-
 		if metadata, ok := result["response_metadata"].(map[string]interface{}); ok {
 			if nextCursor, ok := metadata["next_cursor"].(string); ok && nextCursor != "" {
-				cursor = nextCursor
+				messageCursor = nextCursor
 			} else {
 				break
 			}
@@ -149,8 +163,8 @@ func (c *Client) ListDMChannels(outputJSON string) error {
 	for _, ch := range channels {
 		if channelMap, ok := ch.(map[string]interface{}); ok {
 			dm := map[string]string{
-				"ID":       getString(channelMap, "id"),
-				"User ID":  getString(channelMap, "user"),
+				"ID":      getString(channelMap, "id"),
+				"User ID": getString(channelMap, "user"),
 				"Created": formatTimestamp(getInt64(channelMap, "created")),
 			}
 			dmList = append(dmList, dm)
@@ -265,14 +279,14 @@ func (c *Client) ListChannelMembership(outputJSON string) error {
 	for _, ch := range channels {
 		if channelMap, ok := ch.(map[string]interface{}); ok {
 			channelID := getString(channelMap, "id")
-			
+
 			// Get channel members
 			membersResult, err := c.makeRequest(
 				fmt.Sprintf("https://slack.com/api/conversations.members?channel=%s", channelID),
 				"GET",
 				"",
 			)
-			
+
 			var members []string
 			if err == nil {
 				if membersList, ok := membersResult["members"].([]interface{}); ok {
@@ -347,4 +361,4 @@ func (c *Client) DumpTeamAccessLogs(outputJSON string) error {
 	}
 
 	return nil
-} 
+}
