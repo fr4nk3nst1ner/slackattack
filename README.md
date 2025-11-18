@@ -50,7 +50,7 @@ slackattack --version
 ```bash
 git clone https://github.com/fr4nk3nst1ner/slackattack.git 
 cd slackattack
-go build -o slackattack main.go
+go build -o slackattack slackattack.go
 ```
 
 ## Usage
