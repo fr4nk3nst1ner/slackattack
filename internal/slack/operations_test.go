@@ -80,7 +80,7 @@ func TestListUsersSinglePage(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers returned error: %v", err)
 	}
 
@@ -128,7 +128,7 @@ func TestListUsersPagination(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers returned error: %v", err)
 	}
 
@@ -178,7 +178,7 @@ func TestListUsersLargeWorkspace(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers returned error: %v", err)
 	}
 
@@ -208,7 +208,7 @@ func TestListUsersAdminFlag(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers returned error: %v", err)
 	}
 
@@ -238,7 +238,7 @@ func TestListUsersAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(t, srv.URL)
-	if err := c.ListUsers(""); err == nil {
+	if err := c.ListUsers("", ""); err == nil {
 		t.Fatal("expected error for not_authed response, got nil")
 	}
 }
@@ -258,7 +258,7 @@ func TestListUsersJSONOutput(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers error: %v", err)
 	}
 
@@ -285,5 +285,847 @@ func TestListUsersJSONOutput(t *testing.T) {
 	}
 	if user["Email"] != "test@example.com" {
 		t.Errorf("expected email test@example.com, got %q", user["Email"])
+	}
+}
+
+// --- TestRateLimitWithRetryAfter ---
+
+func TestRateLimitWithRetryAfter(t *testing.T) {
+	var requestCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&requestCount, 1)
+		if n == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			respondJSON(w, map[string]interface{}{"ok": false, "error": "ratelimited"})
+			return
+		}
+		respondJSON(w, membersResponse([]map[string]interface{}{
+			makeMember("U1", "alice", "alice@example.com", false),
+		}, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+	if err := c.ListUsers(outFile, ""); err != nil {
+		t.Fatalf("expected success after retry, got: %v", err)
+	}
+	if atomic.LoadInt32(&requestCount) < 2 {
+		t.Error("expected at least 2 requests (rate limited + retry)")
+	}
+}
+
+func TestRateLimitFallbackBackoff(t *testing.T) {
+	var requestCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&requestCount, 1)
+		if n == 1 {
+			// Rate limited with no Retry-After header
+			respondJSON(w, map[string]interface{}{"ok": false, "error": "ratelimited"})
+			return
+		}
+		respondJSON(w, membersResponse([]map[string]interface{}{
+			makeMember("U1", "alice", "alice@example.com", false),
+		}, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+	if err := c.ListUsers(outFile, ""); err != nil {
+		t.Fatalf("expected success after backoff retry, got: %v", err)
+	}
+	if atomic.LoadInt32(&requestCount) < 2 {
+		t.Error("expected at least 2 requests")
+	}
+}
+
+// --- D2: FindExternalChannels ---
+
+func makeChannel(id, name string, isShared, isExtShared bool) map[string]interface{} {
+	return map[string]interface{}{
+		"id":            id,
+		"name":          name,
+		"is_shared":     isShared,
+		"is_ext_shared": isExtShared,
+		"num_members":   float64(5),
+	}
+}
+
+func channelsResponse(channels []map[string]interface{}, nextCursor string) map[string]interface{} {
+	list := make([]interface{}, len(channels))
+	for i, c := range channels {
+		list[i] = c
+	}
+	return map[string]interface{}{
+		"ok":       true,
+		"channels": list,
+		"response_metadata": map[string]interface{}{
+			"next_cursor": nextCursor,
+		},
+	}
+}
+
+func TestFindExternalChannelsNone(t *testing.T) {
+	channels := []map[string]interface{}{
+		makeChannel("C1", "general", false, false),
+		makeChannel("C2", "random", false, false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "external.json")
+	if err := c.FindExternalChannels(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("expected 0 external channels, got %d", len(out))
+	}
+}
+
+func TestFindExternalChannelsSome(t *testing.T) {
+	channels := []map[string]interface{}{
+		makeChannel("C1", "internal", false, false),
+		makeChannel("C2", "shared-ext", true, true),
+		makeChannel("C3", "org-shared", true, false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "external.json")
+	if err := c.FindExternalChannels(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 2 {
+		t.Errorf("expected 2 external channels, got %d", len(out))
+	}
+	for _, ch := range out {
+		if ch["Channel ID"] == "C1" {
+			t.Error("internal channel should not be in results")
+		}
+	}
+}
+
+func TestFindExternalChannelsExtSharedOnly(t *testing.T) {
+	channels := []map[string]interface{}{
+		makeChannel("C1", "ext-only", false, true),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "external.json")
+	if err := c.FindExternalChannels(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 1 {
+		t.Errorf("expected 1 channel with is_ext_shared=true, got %d", len(out))
+	}
+	if out[0]["Is Ext Shared"] != "Yes" {
+		t.Errorf("expected Is Ext Shared=Yes, got %q", out[0]["Is Ext Shared"])
+	}
+}
+
+func TestFindExternalChannelsAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.FindExternalChannels("", ""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}
+
+// --- D3: ScanPins ---
+
+func TestScanPinsNoChannels(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "conversations.list") {
+			respondJSON(w, channelsResponse(nil, ""))
+		} else {
+			respondJSON(w, map[string]interface{}{"ok": true, "items": []interface{}{}})
+		}
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "pins.json")
+	if err := c.ScanPins(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 0 {
+		t.Errorf("expected 0 pins, got %d", len(out))
+	}
+}
+
+func TestScanPinsWithMessage(t *testing.T) {
+	channel := makeChannel("C1", "general", false, false)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "conversations.list") {
+			respondJSON(w, channelsResponse([]map[string]interface{}{channel}, ""))
+			return
+		}
+		// pins.list
+		respondJSON(w, map[string]interface{}{
+			"ok": true,
+			"items": []interface{}{
+				map[string]interface{}{
+					"type":    "message",
+					"created": float64(1700000000),
+					"message": map[string]interface{}{
+						"text": "super secret: password123",
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "pins.json")
+	if err := c.ScanPins(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 pin, got %d", len(out))
+	}
+	if out[0]["Type"] != "message" {
+		t.Errorf("expected type=message, got %q", out[0]["Type"])
+	}
+	if !strings.Contains(out[0]["Content"], "password123") {
+		t.Errorf("expected pin content to contain password123, got %q", out[0]["Content"])
+	}
+}
+
+func TestScanPinsWithFile(t *testing.T) {
+	channel := makeChannel("C2", "secrets", false, false)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "conversations.list") {
+			respondJSON(w, channelsResponse([]map[string]interface{}{channel}, ""))
+			return
+		}
+		respondJSON(w, map[string]interface{}{
+			"ok": true,
+			"items": []interface{}{
+				map[string]interface{}{
+					"type":    "file",
+					"created": float64(1700000001),
+					"file": map[string]interface{}{
+						"name":        "creds.txt",
+						"url_private": "https://files.slack.com/creds.txt",
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "pins.json")
+	if err := c.ScanPins(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 pin, got %d", len(out))
+	}
+	if out[0]["Type"] != "file" {
+		t.Errorf("expected type=file, got %q", out[0]["Type"])
+	}
+	if !strings.Contains(out[0]["Content"], "creds.txt") {
+		t.Errorf("expected content to contain filename, got %q", out[0]["Content"])
+	}
+}
+
+func TestScanPinsAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.ScanPins("", ""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}
+
+// --- D4: AuditTokenScopes ---
+
+func TestAuditTokenScopesSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{
+			"ok":         true,
+			"user_id":    "U123",
+			"user":       "testbot",
+			"team":       "My Team",
+			"team_id":    "T456",
+			"bot_id":     "B789",
+			"token_type": "bot",
+			"scopes":     "channels:read,users:read,files:read",
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "audit.json")
+	if err := c.AuditTokenScopes(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(out))
+	}
+	if out[0]["User ID"] != "U123" {
+		t.Errorf("expected User ID=U123, got %q", out[0]["User ID"])
+	}
+	if out[0]["Token Type"] != "bot" {
+		t.Errorf("expected Token Type=bot, got %q", out[0]["Token Type"])
+	}
+	if out[0]["Scopes"] != "channels:read,users:read,files:read" {
+		t.Errorf("unexpected scopes: %q", out[0]["Scopes"])
+	}
+}
+
+func TestAuditTokenScopesRequiredFields(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{
+			"ok":      true,
+			"user_id": "UABC",
+			"user":    "alice",
+			"team":    "ACME",
+			"team_id": "TACME",
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "audit.json")
+	if err := c.AuditTokenScopes(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) == 0 {
+		t.Fatal("expected at least 1 record in output")
+	}
+
+	for _, k := range []string{"User ID", "Username", "Team", "Team ID", "Bot ID", "Token Type", "Scopes"} {
+		if _, ok := out[0][k]; !ok {
+			t.Errorf("output missing required key %q", k)
+		}
+	}
+}
+
+func TestAuditTokenScopesAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "invalid_auth"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.AuditTokenScopes("", ""); err == nil {
+		t.Fatal("expected error for invalid_auth, got nil")
+	}
+}
+
+// --- D5: FindWebhooks ---
+
+func makeChannelWithMeta(id, name, topic, purpose string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":   id,
+		"name": name,
+		"topic": map[string]interface{}{
+			"value": topic,
+		},
+		"purpose": map[string]interface{}{
+			"value": purpose,
+		},
+	}
+}
+
+func TestFindWebhooksNone(t *testing.T) {
+	channels := []map[string]interface{}{
+		makeChannelWithMeta("C1", "general", "No hooks here", "Just a channel"),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "webhooks.json")
+	if err := c.FindWebhooks(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 0 {
+		t.Errorf("expected 0 webhooks, got %d", len(out))
+	}
+}
+
+func TestFindWebhooksInTopic(t *testing.T) {
+	hook := "https://hooks.slack.com/services/T00/B00/abc123"
+	channels := []map[string]interface{}{
+		makeChannelWithMeta("C1", "alerts", "Webhook: "+hook, ""),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "webhooks.json")
+	if err := c.FindWebhooks(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 webhook, got %d", len(out))
+	}
+	if out[0]["Webhook URL"] != hook {
+		t.Errorf("expected webhook URL %q, got %q", hook, out[0]["Webhook URL"])
+	}
+	if out[0]["Field"] != "topic" {
+		t.Errorf("expected field=topic, got %q", out[0]["Field"])
+	}
+}
+
+func TestFindWebhooksInPurpose(t *testing.T) {
+	hook := "https://hooks.slack.com/services/T00/B00/xyz789"
+	channels := []map[string]interface{}{
+		makeChannelWithMeta("C2", "deploys", "", "Post here: "+hook),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "webhooks.json")
+	if err := c.FindWebhooks(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 webhook, got %d", len(out))
+	}
+	if out[0]["Field"] != "purpose" {
+		t.Errorf("expected field=purpose, got %q", out[0]["Field"])
+	}
+}
+
+func TestFindWebhooksAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.FindWebhooks("", ""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}
+
+// --- D6: FindHighValueTargets ---
+
+func TestFindHighValueTargetsAdminOnly(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("UADMIN", "admin", "admin@example.com", true),
+		makeMember("UNORM", "normal", "normal@example.com", false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "targets.json")
+	if err := c.FindHighValueTargets(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(out))
+	}
+	if out[0]["User ID"] != "UADMIN" {
+		t.Errorf("expected UADMIN, got %q", out[0]["User ID"])
+	}
+	if out[0]["Is Admin"] != "Yes" {
+		t.Errorf("expected Is Admin=Yes, got %q", out[0]["Is Admin"])
+	}
+}
+
+func TestFindHighValueTargetsOwner(t *testing.T) {
+	owner := map[string]interface{}{
+		"id":               "UOWNER",
+		"name":             "owner",
+		"real_name":        "Owner",
+		"is_admin":         false,
+		"is_owner":         true,
+		"is_primary_owner": true,
+		"profile": map[string]interface{}{
+			"display_name": "owner",
+			"email":        "owner@example.com",
+		},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse([]map[string]interface{}{owner}, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "targets.json")
+	if err := c.FindHighValueTargets(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(out))
+	}
+	if out[0]["Is Owner"] != "Yes" {
+		t.Errorf("expected Is Owner=Yes, got %q", out[0]["Is Owner"])
+	}
+	if out[0]["Is Primary Owner"] != "Yes" {
+		t.Errorf("expected Is Primary Owner=Yes, got %q", out[0]["Is Primary Owner"])
+	}
+}
+
+func TestFindHighValueTargetsNone(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("U1", "alice", "alice@example.com", false),
+		makeMember("U2", "bob", "bob@example.com", false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "targets.json")
+	if err := c.FindHighValueTargets(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 0 {
+		t.Errorf("expected 0 targets, got %d", len(out))
+	}
+}
+
+func TestFindHighValueTargetsAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.FindHighValueTargets("", ""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}
+
+// --- D7: ScanFileContent ---
+
+func makeFileEntry(name, mimetype, urlPath string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":          "F001",
+		"name":        name,
+		"mimetype":    mimetype,
+		"url_private": urlPath,
+	}
+}
+
+func TestScanFileContentFindsSecrets(t *testing.T) {
+	const secretContent = "aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\npassword: hunter2"
+
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "files.list") {
+			respondJSON(w, map[string]interface{}{
+				"ok": true,
+				"files": []interface{}{
+					map[string]interface{}{
+						"id": "F001", "name": "config.txt",
+						"mimetype":    "text/plain",
+						"url_private": srvURL + "/files/config.txt",
+					},
+				},
+			})
+			return
+		}
+		fmt.Fprint(w, secretContent)
+	}))
+	defer srv.Close()
+	srvURL = srv.URL
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "scan.json")
+	if err := c.ScanFileContent(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) == 0 {
+		t.Fatal("expected at least one finding, got 0")
+	}
+}
+
+func TestScanFileContentSkipsBinary(t *testing.T) {
+	var fileDownloaded bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "files.list") {
+			respondJSON(w, map[string]interface{}{
+				"ok": true,
+				"files": []interface{}{
+					makeFileEntry("photo.png", "image/png", "/files/photo.png"),
+				},
+			})
+			return
+		}
+		fileDownloaded = true
+		fmt.Fprint(w, "binary content")
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	c.baseURL = srv.URL
+
+	outFile := filepath.Join(t.TempDir(), "scan.json")
+	if err := c.ScanFileContent(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fileDownloaded {
+		t.Error("binary file should have been skipped, not downloaded")
+	}
+}
+
+func TestScanFileContentNoFindings(t *testing.T) {
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "files.list") {
+			respondJSON(w, map[string]interface{}{
+				"ok": true,
+				"files": []interface{}{
+					map[string]interface{}{
+						"id": "F002", "name": "notes.txt",
+						"mimetype":    "text/plain",
+						"url_private": srvURL + "/files/notes.txt",
+					},
+				},
+			})
+			return
+		}
+		fmt.Fprint(w, "nothing sensitive here")
+	}))
+	defer srv.Close()
+	srvURL = srv.URL
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "scan.json")
+	if err := c.ScanFileContent(outFile, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 0 {
+		t.Errorf("expected 0 findings, got %d", len(out))
+	}
+}
+
+func TestScanFileContentAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.ScanFileContent("", ""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}
+
+// --- D8: CSV output ---
+
+func TestWriteCSVUsersRoundTrip(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("U1", "alice", "alice@example.com", true),
+		makeMember("U2", "bob", "bob@example.com", false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	csvFile := filepath.Join(t.TempDir(), "users.csv")
+	if err := c.ListUsers("", csvFile); err != nil {
+		t.Fatalf("ListUsers CSV error: %v", err)
+	}
+
+	data, err := os.ReadFile(csvFile)
+	if err != nil {
+		t.Fatalf("CSV file missing: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "User ID") {
+		t.Error("CSV missing User ID header")
+	}
+	if !strings.Contains(content, "alice") {
+		t.Error("CSV missing alice row")
+	}
+	if !strings.Contains(content, "bob") {
+		t.Error("CSV missing bob row")
+	}
+}
+
+func TestWriteCSVBothOutputs(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("U1", "alice", "alice@example.com", false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	tmp := t.TempDir()
+	c := newTestClient(t, srv.URL)
+	jsonFile := filepath.Join(tmp, "users.json")
+	csvFile := filepath.Join(tmp, "users.csv")
+	if err := c.ListUsers(jsonFile, csvFile); err != nil {
+		t.Fatalf("ListUsers both outputs error: %v", err)
+	}
+
+	jsonData, err := os.ReadFile(jsonFile)
+	if err != nil {
+		t.Fatalf("JSON file missing: %v", err)
+	}
+	var jsonOut []map[string]string
+	if err := json.Unmarshal(jsonData, &jsonOut); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(jsonOut) != 1 {
+		t.Errorf("expected 1 JSON record, got %d", len(jsonOut))
+	}
+
+	csvData, err := os.ReadFile(csvFile)
+	if err != nil {
+		t.Fatalf("CSV file missing: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(csvData)), "\n")
+	if len(lines) != 2 { // header + 1 row
+		t.Errorf("expected 2 CSV lines (header+row), got %d", len(lines))
+	}
+}
+
+func TestWriteCSVEmptyProducesNoRows(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(nil, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	csvFile := filepath.Join(t.TempDir(), "external.csv")
+	if err := c.FindExternalChannels("", csvFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(csvFile)
+	if len(strings.TrimSpace(string(data))) != 0 {
+		t.Errorf("expected empty CSV for no results, got: %s", data)
+	}
+}
+
+func TestWriteCSVHighValueTargets(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("UADMIN", "admin", "admin@example.com", true),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	csvFile := filepath.Join(t.TempDir(), "targets.csv")
+	if err := c.FindHighValueTargets("", csvFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(csvFile)
+	if !strings.Contains(string(data), "UADMIN") {
+		t.Errorf("CSV missing UADMIN row: %s", data)
 	}
 }

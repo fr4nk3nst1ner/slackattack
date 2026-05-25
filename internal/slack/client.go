@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
-	"regexp"
 
 	"github.com/fr4nk3nst1ner/slackattack/internal/auth"
 )
@@ -62,13 +63,20 @@ func (c *Client) makeRequest(endpoint, method string, payload string) (map[strin
 		}
 		defer resp.Body.Close()
 
+		data = nil
 		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 			continue
 		}
 
-		// Check for rate limiting
+		// Check for rate limiting — respect Retry-After header if present
 		if errMsg, ok := data["error"].(string); ok && errMsg == "ratelimited" {
 			if attempt < maxRetries-1 {
+				if ra := resp.Header.Get("Retry-After"); ra != "" {
+					if secs, parseErr := strconv.Atoi(ra); parseErr == nil {
+						time.Sleep(time.Duration(secs) * time.Second)
+						retryDelay = time.Duration(secs) * time.Second * 2
+					}
+				}
 				continue
 			}
 			return nil, fmt.Errorf("rate limited")

@@ -19,18 +19,25 @@ type Config struct {
 	ProxyURL     string
 
 	// Actions
-	ListChannels       bool
-	ListUsers         bool
-	ListFiles         bool
-	DownloadFiles     bool
-	Pillage           string
-	DumpChannel       string
-	ListDMs           bool
-	DumpDM            string
-	ChannelMembership bool
-	CheckPermissions  bool
-	DumpLogs         bool
-	Test             bool
+	ListChannels        bool
+	ListUsers           bool
+	ListFiles           bool
+	DownloadFiles       bool
+	Pillage             string
+	DumpChannel         string
+	ListDMs             bool
+	DumpDM              string
+	ChannelMembership   bool
+	CheckPermissions    bool
+	DumpLogs            bool
+	Test                bool
+	FindExternalChannels bool
+	ScanPins             bool
+	AuditTokenScopes     bool
+	FindWebhooks         bool
+	FindHighValueTargets bool
+	ScanFileContent      bool
+	OutputCSV            string
 
 	// Output options
 	OutputJSON   string
@@ -92,6 +99,13 @@ func parseFlags() *Config {
 	flag.BoolVar(&cfg.CheckPermissions, "check-permissions", false, "Check API token permissions")
 	flag.BoolVar(&cfg.DumpLogs, "dump-logs", false, "Dump team access logs")
 	flag.BoolVar(&cfg.Test, "test", false, "Test Slack credentials")
+	flag.BoolVar(&cfg.FindExternalChannels, "find-external-channels", false, "Find channels shared with external orgs")
+	flag.BoolVar(&cfg.ScanPins, "scan-pins", false, "Scan pinned messages across all accessible channels")
+	flag.BoolVar(&cfg.AuditTokenScopes, "audit-token", false, "Audit token identity and OAuth scopes via auth.test")
+	flag.BoolVar(&cfg.FindWebhooks, "find-webhooks", false, "Scan channel topics/purposes for Slack incoming webhook URLs")
+	flag.BoolVar(&cfg.FindHighValueTargets, "find-targets", false, "List workspace admins and owners (high-value targets)")
+	flag.BoolVar(&cfg.ScanFileContent, "scan-files", false, "Download accessible text files and scan for secrets")
+	flag.StringVar(&cfg.OutputCSV, "output-csv", "", "Save output in CSV format to the specified file")
 
 	// Output flags
 	flag.StringVar(&cfg.OutputJSON, "output-json", "", "Save output in JSON format to the specified file")
@@ -128,7 +142,9 @@ func parseFlags() *Config {
 func (c *Config) hasAction() bool {
 	return c.ListChannels || c.ListUsers || c.ListFiles || c.DownloadFiles ||
 		c.Pillage != "" || c.DumpChannel != "" || c.ListDMs || c.DumpDM != "" ||
-		c.ChannelMembership || c.CheckPermissions || c.DumpLogs || c.Test
+		c.ChannelMembership || c.CheckPermissions || c.DumpLogs || c.Test ||
+		c.FindExternalChannels || c.ScanPins || c.AuditTokenScopes || c.FindWebhooks ||
+		c.FindHighValueTargets || c.ScanFileContent
 }
 
 func executeActions(client *slack.Client, cfg *Config) error {
@@ -155,13 +171,13 @@ func executeActions(client *slack.Client, cfg *Config) error {
 	}
 
 	if cfg.ListUsers {
-		if err := client.ListUsers(cfg.OutputJSON); err != nil {
+		if err := client.ListUsers(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
 
 	if cfg.ListFiles {
-		if err := client.ListFiles(cfg.OutputJSON); err != nil {
+		if err := client.ListFiles(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
@@ -204,6 +220,42 @@ func executeActions(client *slack.Client, cfg *Config) error {
 
 	if cfg.DumpLogs {
 		if err := client.DumpTeamAccessLogs(cfg.OutputJSON); err != nil {
+			return err
+		}
+	}
+
+	if cfg.FindExternalChannels {
+		if err := client.FindExternalChannels(cfg.OutputJSON, cfg.OutputCSV); err != nil {
+			return err
+		}
+	}
+
+	if cfg.ScanPins {
+		if err := client.ScanPins(cfg.OutputJSON, cfg.OutputCSV); err != nil {
+			return err
+		}
+	}
+
+	if cfg.AuditTokenScopes {
+		if err := client.AuditTokenScopes(cfg.OutputJSON, cfg.OutputCSV); err != nil {
+			return err
+		}
+	}
+
+	if cfg.FindWebhooks {
+		if err := client.FindWebhooks(cfg.OutputJSON, cfg.OutputCSV); err != nil {
+			return err
+		}
+	}
+
+	if cfg.FindHighValueTargets {
+		if err := client.FindHighValueTargets(cfg.OutputJSON, cfg.OutputCSV); err != nil {
+			return err
+		}
+	}
+
+	if cfg.ScanFileContent {
+		if err := client.ScanFileContent(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
