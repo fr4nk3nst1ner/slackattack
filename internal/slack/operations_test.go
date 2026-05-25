@@ -1,0 +1,289 @@
+package slack
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
+	"testing"
+
+	"github.com/fr4nk3nst1ner/slackattack/internal/auth"
+)
+
+// newTestClient creates a Client wired to the given test server URL.
+func newTestClient(t *testing.T, serverURL string) *Client {
+	t.Helper()
+	creds, err := auth.NewCredentials("xoxb-test-token", "", "", "")
+	if err != nil {
+		t.Fatalf("failed to create credentials: %v", err)
+	}
+	c, err := NewClient(creds)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+	c.baseURL = serverURL
+	return c
+}
+
+func respondJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func makeMember(id, name, email string, isAdmin bool) map[string]interface{} {
+	return map[string]interface{}{
+		"id":               id,
+		"name":             name,
+		"real_name":        name,
+		"is_admin":         isAdmin,
+		"is_owner":         false,
+		"is_primary_owner": false,
+		"profile": map[string]interface{}{
+			"display_name": name,
+			"email":        email,
+		},
+	}
+}
+
+func membersResponse(members []map[string]interface{}, nextCursor string) map[string]interface{} {
+	list := make([]interface{}, len(members))
+	for i, m := range members {
+		list[i] = m
+	}
+	return map[string]interface{}{
+		"ok":      true,
+		"members": list,
+		"response_metadata": map[string]interface{}{
+			"next_cursor": nextCursor,
+		},
+	}
+}
+
+// --- TestListUsersSinglePage ---
+
+func TestListUsersSinglePage(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("U1", "alice", "alice@example.com", false),
+		makeMember("U2", "bob", "bob@example.com", false),
+		makeMember("U3", "carol", "carol@example.com", false),
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+
+	if err := c.ListUsers(outFile); err != nil {
+		t.Fatalf("ListUsers returned error: %v", err)
+	}
+
+	data, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("could not read output file: %v", err)
+	}
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if len(out) != 3 {
+		t.Errorf("expected 3 users, got %d", len(out))
+	}
+}
+
+// --- TestListUsersPagination ---
+
+func TestListUsersPagination(t *testing.T) {
+	const cursorPage2 = "cursor_page2"
+	var requestCount int32
+
+	page1 := make([]map[string]interface{}, 10)
+	for i := range page1 {
+		page1[i] = makeMember(fmt.Sprintf("U1%d", i), fmt.Sprintf("user1%d", i), fmt.Sprintf("u1%d@example.com", i), false)
+	}
+	page2 := make([]map[string]interface{}, 5)
+	for i := range page2 {
+		page2[i] = makeMember(fmt.Sprintf("U2%d", i), fmt.Sprintf("user2%d", i), fmt.Sprintf("u2%d@example.com", i), false)
+	}
+
+	var capturedPage2Query string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&requestCount, 1)
+		if n == 1 {
+			respondJSON(w, membersResponse(page1, cursorPage2))
+		} else {
+			capturedPage2Query = r.URL.RawQuery
+			respondJSON(w, membersResponse(page2, ""))
+		}
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+
+	if err := c.ListUsers(outFile); err != nil {
+		t.Fatalf("ListUsers returned error: %v", err)
+	}
+
+	if !strings.Contains(capturedPage2Query, "cursor="+cursorPage2) {
+		t.Errorf("page 2 request URL %q missing cursor=%s", capturedPage2Query, cursorPage2)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if len(out) != 15 {
+		t.Errorf("expected 15 users across 2 pages, got %d", len(out))
+	}
+}
+
+// --- TestListUsersLargeWorkspace ---
+
+func TestListUsersLargeWorkspace(t *testing.T) {
+	cursors := []string{"page2", "page3", ""}
+	var requestCount int32
+
+	makeMembers := func(n int, prefix string) []map[string]interface{} {
+		m := make([]map[string]interface{}, n)
+		for i := range m {
+			m[i] = makeMember(fmt.Sprintf("%s%d", prefix, i), fmt.Sprintf("%s%d", prefix, i), fmt.Sprintf("%s%d@x.com", prefix, i), false)
+		}
+		return m
+	}
+
+	pages := [][]map[string]interface{}{
+		makeMembers(10, "A"),
+		makeMembers(10, "B"),
+		makeMembers(5, "C"),
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		idx := int(atomic.AddInt32(&requestCount, 1)) - 1
+		if idx >= len(pages) {
+			idx = len(pages) - 1
+		}
+		respondJSON(w, membersResponse(pages[idx], cursors[idx]))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+
+	if err := c.ListUsers(outFile); err != nil {
+		t.Fatalf("ListUsers returned error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if len(out) != 25 {
+		t.Errorf("expected 25 users across 3 pages, got %d", len(out))
+	}
+}
+
+// --- TestListUsersAdminFlag ---
+
+func TestListUsersAdminFlag(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("UADMIN", "admin", "admin@example.com", true),
+		makeMember("UNORM", "normal", "normal@example.com", false),
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+
+	if err := c.ListUsers(outFile); err != nil {
+		t.Fatalf("ListUsers returned error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+
+	for _, u := range out {
+		if u["User ID"] == "UADMIN" && u["Is Admin"] != "Yes" {
+			t.Errorf("admin user: expected Is Admin=Yes, got %q", u["Is Admin"])
+		}
+		if u["User ID"] == "UNORM" && u["Is Admin"] != "No" {
+			t.Errorf("normal user: expected Is Admin=No, got %q", u["Is Admin"])
+		}
+	}
+}
+
+// --- TestListUsersAPIError ---
+
+func TestListUsersAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{
+			"ok":    false,
+			"error": "not_authed",
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.ListUsers(""); err == nil {
+		t.Fatal("expected error for not_authed response, got nil")
+	}
+}
+
+// --- TestListUsersJSONOutput ---
+
+func TestListUsersJSONOutput(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("U999", "testuser", "test@example.com", false),
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+
+	if err := c.ListUsers(outFile); err != nil {
+		t.Fatalf("ListUsers error: %v", err)
+	}
+
+	data, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("output file missing: %v", err)
+	}
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) == 0 {
+		t.Fatal("expected at least one user in output")
+	}
+
+	user := out[0]
+	for _, k := range []string{"User ID", "Username", "Email", "Real Name", "Display Name", "Is Admin", "Is Owner", "Is Primary Owner"} {
+		if _, ok := user[k]; !ok {
+			t.Errorf("output missing required key %q", k)
+		}
+	}
+	if user["User ID"] != "U999" {
+		t.Errorf("expected User ID U999, got %q", user["User ID"])
+	}
+	if user["Email"] != "test@example.com" {
+		t.Errorf("expected email test@example.com, got %q", user["Email"])
+	}
+}

@@ -16,6 +16,7 @@ import (
 type Client struct {
 	credentials *auth.Credentials
 	httpClient  *http.Client
+	baseURL     string // defaults to "https://slack.com"; override in tests
 }
 
 // NewClient creates a new Slack client
@@ -28,11 +29,15 @@ func NewClient(credentials *auth.Credentials) (*Client, error) {
 	return &Client{
 		credentials: credentials,
 		httpClient:  httpClient,
+		baseURL:     "https://slack.com",
 	}, nil
 }
 
 // makeRequest makes a request to the Slack API
 func (c *Client) makeRequest(endpoint, method string, payload string) (map[string]interface{}, error) {
+	if c.baseURL != "https://slack.com" {
+		endpoint = strings.Replace(endpoint, "https://slack.com", c.baseURL, 1)
+	}
 	maxRetries := 3
 	retryDelay := time.Second * 2
 
