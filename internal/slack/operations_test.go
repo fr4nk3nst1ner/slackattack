@@ -668,3 +668,112 @@ func TestAuditTokenScopesAPIError(t *testing.T) {
 		t.Fatal("expected error for invalid_auth, got nil")
 	}
 }
+
+// --- D5: FindWebhooks ---
+
+func makeChannelWithMeta(id, name, topic, purpose string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":   id,
+		"name": name,
+		"topic": map[string]interface{}{
+			"value": topic,
+		},
+		"purpose": map[string]interface{}{
+			"value": purpose,
+		},
+	}
+}
+
+func TestFindWebhooksNone(t *testing.T) {
+	channels := []map[string]interface{}{
+		makeChannelWithMeta("C1", "general", "No hooks here", "Just a channel"),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "webhooks.json")
+	if err := c.FindWebhooks(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 0 {
+		t.Errorf("expected 0 webhooks, got %d", len(out))
+	}
+}
+
+func TestFindWebhooksInTopic(t *testing.T) {
+	hook := "https://hooks.slack.com/services/T00/B00/abc123"
+	channels := []map[string]interface{}{
+		makeChannelWithMeta("C1", "alerts", "Webhook: "+hook, ""),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "webhooks.json")
+	if err := c.FindWebhooks(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 webhook, got %d", len(out))
+	}
+	if out[0]["Webhook URL"] != hook {
+		t.Errorf("expected webhook URL %q, got %q", hook, out[0]["Webhook URL"])
+	}
+	if out[0]["Field"] != "topic" {
+		t.Errorf("expected field=topic, got %q", out[0]["Field"])
+	}
+}
+
+func TestFindWebhooksInPurpose(t *testing.T) {
+	hook := "https://hooks.slack.com/services/T00/B00/xyz789"
+	channels := []map[string]interface{}{
+		makeChannelWithMeta("C2", "deploys", "", "Post here: "+hook),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "webhooks.json")
+	if err := c.FindWebhooks(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 webhook, got %d", len(out))
+	}
+	if out[0]["Field"] != "purpose" {
+		t.Errorf("expected field=purpose, got %q", out[0]["Field"])
+	}
+}
+
+func TestFindWebhooksAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.FindWebhooks(""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}

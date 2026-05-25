@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/fr4nk3nst1ner/slackattack/internal/models"
@@ -284,6 +285,72 @@ func (c *Client) Pillage(channelName string, outputJSON string) error {
 
 	// TODO: Implement actual secret scanning logic
 	fmt.Printf("Scanning %d channels for secrets...\n", len(channelsToScan))
+	return nil
+}
+
+var webhookRe = regexp.MustCompile(`https://hooks\.slack\.com/\S+`)
+
+// FindWebhooks scans channel topics and purposes for Slack incoming webhook URLs
+func (c *Client) FindWebhooks(outputJSON string) error {
+	cursor := ""
+	var results []map[string]string
+
+	for {
+		endpoint := "https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200"
+		if cursor != "" {
+			endpoint += "&cursor=" + cursor
+		}
+		result, err := c.makeRequest(endpoint, "POST", "")
+		if err != nil {
+			return fmt.Errorf("failed to list channels: %v", err)
+		}
+
+		channels, _ := result["channels"].([]interface{})
+		for _, ch := range channels {
+			chMap, ok := ch.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			channelID := getString(chMap, "id")
+			channelName := getString(chMap, "name")
+
+			// Check topic and purpose fields for webhook URLs
+			for _, field := range []string{"topic", "purpose"} {
+				fieldMap, ok := chMap[field].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				value := getString(fieldMap, "value")
+				for _, match := range webhookRe.FindAllString(value, -1) {
+					results = append(results, map[string]string{
+						"Channel ID":   channelID,
+						"Channel Name": channelName,
+						"Field":        field,
+						"Webhook URL":  match,
+					})
+				}
+			}
+		}
+
+		meta, _ := result["response_metadata"].(map[string]interface{})
+		next, _ := meta["next_cursor"].(string)
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+
+	if outputJSON != "" {
+		return writeJSON(outputJSON, results)
+	}
+
+	fmt.Println("\nWebhooks Found:")
+	for _, wh := range results {
+		fmt.Printf("\nWebhook:\n")
+		for k, v := range wh {
+			fmt.Printf("  %s: %s\n", k, v)
+		}
+	}
 	return nil
 }
 
