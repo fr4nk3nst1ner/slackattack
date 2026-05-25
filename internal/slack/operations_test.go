@@ -80,7 +80,7 @@ func TestListUsersSinglePage(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers returned error: %v", err)
 	}
 
@@ -128,7 +128,7 @@ func TestListUsersPagination(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers returned error: %v", err)
 	}
 
@@ -178,7 +178,7 @@ func TestListUsersLargeWorkspace(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers returned error: %v", err)
 	}
 
@@ -208,7 +208,7 @@ func TestListUsersAdminFlag(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers returned error: %v", err)
 	}
 
@@ -238,7 +238,7 @@ func TestListUsersAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(t, srv.URL)
-	if err := c.ListUsers(""); err == nil {
+	if err := c.ListUsers("", ""); err == nil {
 		t.Fatal("expected error for not_authed response, got nil")
 	}
 }
@@ -258,7 +258,7 @@ func TestListUsersJSONOutput(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
 
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("ListUsers error: %v", err)
 	}
 
@@ -308,7 +308,7 @@ func TestRateLimitWithRetryAfter(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("expected success after retry, got: %v", err)
 	}
 	if atomic.LoadInt32(&requestCount) < 2 {
@@ -333,7 +333,7 @@ func TestRateLimitFallbackBackoff(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "users.json")
-	if err := c.ListUsers(outFile); err != nil {
+	if err := c.ListUsers(outFile, ""); err != nil {
 		t.Fatalf("expected success after backoff retry, got: %v", err)
 	}
 	if atomic.LoadInt32(&requestCount) < 2 {
@@ -379,7 +379,7 @@ func TestFindExternalChannelsNone(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "external.json")
-	if err := c.FindExternalChannels(outFile); err != nil {
+	if err := c.FindExternalChannels(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -406,7 +406,7 @@ func TestFindExternalChannelsSome(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "external.json")
-	if err := c.FindExternalChannels(outFile); err != nil {
+	if err := c.FindExternalChannels(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -436,7 +436,7 @@ func TestFindExternalChannelsExtSharedOnly(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "external.json")
-	if err := c.FindExternalChannels(outFile); err != nil {
+	if err := c.FindExternalChannels(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -458,7 +458,7 @@ func TestFindExternalChannelsAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(t, srv.URL)
-	if err := c.FindExternalChannels(""); err == nil {
+	if err := c.FindExternalChannels("", ""); err == nil {
 		t.Fatal("expected error for not_authed, got nil")
 	}
 }
@@ -477,7 +477,7 @@ func TestScanPinsNoChannels(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "pins.json")
-	if err := c.ScanPins(outFile); err != nil {
+	if err := c.ScanPins(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -514,7 +514,7 @@ func TestScanPinsWithMessage(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "pins.json")
-	if err := c.ScanPins(outFile); err != nil {
+	if err := c.ScanPins(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -559,7 +559,7 @@ func TestScanPinsWithFile(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "pins.json")
-	if err := c.ScanPins(outFile); err != nil {
+	if err := c.ScanPins(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -584,7 +584,7 @@ func TestScanPinsAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(t, srv.URL)
-	if err := c.ScanPins(""); err == nil {
+	if err := c.ScanPins("", ""); err == nil {
 		t.Fatal("expected error for not_authed, got nil")
 	}
 }
@@ -608,23 +608,26 @@ func TestAuditTokenScopesSuccess(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "audit.json")
-	if err := c.AuditTokenScopes(outFile); err != nil {
+	if err := c.AuditTokenScopes(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	data, _ := os.ReadFile(outFile)
-	var out map[string]string
+	var out []map[string]string
 	if err := json.Unmarshal(data, &out); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if out["User ID"] != "U123" {
-		t.Errorf("expected User ID=U123, got %q", out["User ID"])
+	if len(out) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(out))
 	}
-	if out["Token Type"] != "bot" {
-		t.Errorf("expected Token Type=bot, got %q", out["Token Type"])
+	if out[0]["User ID"] != "U123" {
+		t.Errorf("expected User ID=U123, got %q", out[0]["User ID"])
 	}
-	if out["Scopes"] != "channels:read,users:read,files:read" {
-		t.Errorf("unexpected scopes: %q", out["Scopes"])
+	if out[0]["Token Type"] != "bot" {
+		t.Errorf("expected Token Type=bot, got %q", out[0]["Token Type"])
+	}
+	if out[0]["Scopes"] != "channels:read,users:read,files:read" {
+		t.Errorf("unexpected scopes: %q", out[0]["Scopes"])
 	}
 }
 
@@ -642,16 +645,19 @@ func TestAuditTokenScopesRequiredFields(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "audit.json")
-	if err := c.AuditTokenScopes(outFile); err != nil {
+	if err := c.AuditTokenScopes(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	data, _ := os.ReadFile(outFile)
-	var out map[string]string
+	var out []map[string]string
 	_ = json.Unmarshal(data, &out)
+	if len(out) == 0 {
+		t.Fatal("expected at least 1 record in output")
+	}
 
 	for _, k := range []string{"User ID", "Username", "Team", "Team ID", "Bot ID", "Token Type", "Scopes"} {
-		if _, ok := out[k]; !ok {
+		if _, ok := out[0][k]; !ok {
 			t.Errorf("output missing required key %q", k)
 		}
 	}
@@ -664,7 +670,7 @@ func TestAuditTokenScopesAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(t, srv.URL)
-	if err := c.AuditTokenScopes(""); err == nil {
+	if err := c.AuditTokenScopes("", ""); err == nil {
 		t.Fatal("expected error for invalid_auth, got nil")
 	}
 }
@@ -695,7 +701,7 @@ func TestFindWebhooksNone(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "webhooks.json")
-	if err := c.FindWebhooks(outFile); err != nil {
+	if err := c.FindWebhooks(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -719,7 +725,7 @@ func TestFindWebhooksInTopic(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "webhooks.json")
-	if err := c.FindWebhooks(outFile); err != nil {
+	if err := c.FindWebhooks(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -751,7 +757,7 @@ func TestFindWebhooksInPurpose(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "webhooks.json")
-	if err := c.FindWebhooks(outFile); err != nil {
+	if err := c.FindWebhooks(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -773,7 +779,7 @@ func TestFindWebhooksAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(t, srv.URL)
-	if err := c.FindWebhooks(""); err == nil {
+	if err := c.FindWebhooks("", ""); err == nil {
 		t.Fatal("expected error for not_authed, got nil")
 	}
 }
@@ -792,7 +798,7 @@ func TestFindHighValueTargetsAdminOnly(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "targets.json")
-	if err := c.FindHighValueTargets(outFile); err != nil {
+	if err := c.FindHighValueTargets(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -832,7 +838,7 @@ func TestFindHighValueTargetsOwner(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "targets.json")
-	if err := c.FindHighValueTargets(outFile); err != nil {
+	if err := c.FindHighValueTargets(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -862,7 +868,7 @@ func TestFindHighValueTargetsNone(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "targets.json")
-	if err := c.FindHighValueTargets(outFile); err != nil {
+	if err := c.FindHighValueTargets(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -881,7 +887,7 @@ func TestFindHighValueTargetsAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(t, srv.URL)
-	if err := c.FindHighValueTargets(""); err == nil {
+	if err := c.FindHighValueTargets("", ""); err == nil {
 		t.Fatal("expected error for not_authed, got nil")
 	}
 }
@@ -922,7 +928,7 @@ func TestScanFileContentFindsSecrets(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "scan.json")
-	if err := c.ScanFileContent(outFile); err != nil {
+	if err := c.ScanFileContent(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -957,7 +963,7 @@ func TestScanFileContentSkipsBinary(t *testing.T) {
 	c.baseURL = srv.URL
 
 	outFile := filepath.Join(t.TempDir(), "scan.json")
-	if err := c.ScanFileContent(outFile); err != nil {
+	if err := c.ScanFileContent(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if fileDownloaded {
@@ -988,7 +994,7 @@ func TestScanFileContentNoFindings(t *testing.T) {
 
 	c := newTestClient(t, srv.URL)
 	outFile := filepath.Join(t.TempDir(), "scan.json")
-	if err := c.ScanFileContent(outFile); err != nil {
+	if err := c.ScanFileContent(outFile, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -1007,7 +1013,119 @@ func TestScanFileContentAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestClient(t, srv.URL)
-	if err := c.ScanFileContent(""); err == nil {
+	if err := c.ScanFileContent("", ""); err == nil {
 		t.Fatal("expected error for not_authed, got nil")
+	}
+}
+
+// --- D8: CSV output ---
+
+func TestWriteCSVUsersRoundTrip(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("U1", "alice", "alice@example.com", true),
+		makeMember("U2", "bob", "bob@example.com", false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	csvFile := filepath.Join(t.TempDir(), "users.csv")
+	if err := c.ListUsers("", csvFile); err != nil {
+		t.Fatalf("ListUsers CSV error: %v", err)
+	}
+
+	data, err := os.ReadFile(csvFile)
+	if err != nil {
+		t.Fatalf("CSV file missing: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "User ID") {
+		t.Error("CSV missing User ID header")
+	}
+	if !strings.Contains(content, "alice") {
+		t.Error("CSV missing alice row")
+	}
+	if !strings.Contains(content, "bob") {
+		t.Error("CSV missing bob row")
+	}
+}
+
+func TestWriteCSVBothOutputs(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("U1", "alice", "alice@example.com", false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	tmp := t.TempDir()
+	c := newTestClient(t, srv.URL)
+	jsonFile := filepath.Join(tmp, "users.json")
+	csvFile := filepath.Join(tmp, "users.csv")
+	if err := c.ListUsers(jsonFile, csvFile); err != nil {
+		t.Fatalf("ListUsers both outputs error: %v", err)
+	}
+
+	jsonData, err := os.ReadFile(jsonFile)
+	if err != nil {
+		t.Fatalf("JSON file missing: %v", err)
+	}
+	var jsonOut []map[string]string
+	if err := json.Unmarshal(jsonData, &jsonOut); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(jsonOut) != 1 {
+		t.Errorf("expected 1 JSON record, got %d", len(jsonOut))
+	}
+
+	csvData, err := os.ReadFile(csvFile)
+	if err != nil {
+		t.Fatalf("CSV file missing: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(csvData)), "\n")
+	if len(lines) != 2 { // header + 1 row
+		t.Errorf("expected 2 CSV lines (header+row), got %d", len(lines))
+	}
+}
+
+func TestWriteCSVEmptyProducesNoRows(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(nil, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	csvFile := filepath.Join(t.TempDir(), "external.csv")
+	if err := c.FindExternalChannels("", csvFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(csvFile)
+	if len(strings.TrimSpace(string(data))) != 0 {
+		t.Errorf("expected empty CSV for no results, got: %s", data)
+	}
+}
+
+func TestWriteCSVHighValueTargets(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("UADMIN", "admin", "admin@example.com", true),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	csvFile := filepath.Join(t.TempDir(), "targets.csv")
+	if err := c.FindHighValueTargets("", csvFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(csvFile)
+	if !strings.Contains(string(data), "UADMIN") {
+		t.Errorf("CSV missing UADMIN row: %s", data)
 	}
 }

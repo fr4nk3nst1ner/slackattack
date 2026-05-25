@@ -37,6 +37,7 @@ type Config struct {
 	FindWebhooks         bool
 	FindHighValueTargets bool
 	ScanFileContent      bool
+	OutputCSV            string
 
 	// Output options
 	OutputJSON   string
@@ -104,6 +105,7 @@ func parseFlags() *Config {
 	flag.BoolVar(&cfg.FindWebhooks, "find-webhooks", false, "Scan channel topics/purposes for Slack incoming webhook URLs")
 	flag.BoolVar(&cfg.FindHighValueTargets, "find-targets", false, "List workspace admins and owners (high-value targets)")
 	flag.BoolVar(&cfg.ScanFileContent, "scan-files", false, "Download accessible text files and scan for secrets")
+	flag.StringVar(&cfg.OutputCSV, "output-csv", "", "Save output in CSV format to the specified file")
 
 	// Output flags
 	flag.StringVar(&cfg.OutputJSON, "output-json", "", "Save output in JSON format to the specified file")
@@ -169,13 +171,13 @@ func executeActions(client *slack.Client, cfg *Config) error {
 	}
 
 	if cfg.ListUsers {
-		if err := client.ListUsers(cfg.OutputJSON); err != nil {
+		if err := client.ListUsers(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
 
 	if cfg.ListFiles {
-		if err := client.ListFiles(cfg.OutputJSON); err != nil {
+		if err := client.ListFiles(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
@@ -223,37 +225,37 @@ func executeActions(client *slack.Client, cfg *Config) error {
 	}
 
 	if cfg.FindExternalChannels {
-		if err := client.FindExternalChannels(cfg.OutputJSON); err != nil {
+		if err := client.FindExternalChannels(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
 
 	if cfg.ScanPins {
-		if err := client.ScanPins(cfg.OutputJSON); err != nil {
+		if err := client.ScanPins(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
 
 	if cfg.AuditTokenScopes {
-		if err := client.AuditTokenScopes(cfg.OutputJSON); err != nil {
+		if err := client.AuditTokenScopes(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
 
 	if cfg.FindWebhooks {
-		if err := client.FindWebhooks(cfg.OutputJSON); err != nil {
+		if err := client.FindWebhooks(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
 
 	if cfg.FindHighValueTargets {
-		if err := client.FindHighValueTargets(cfg.OutputJSON); err != nil {
+		if err := client.FindHighValueTargets(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}
 
 	if cfg.ScanFileContent {
-		if err := client.ScanFileContent(cfg.OutputJSON); err != nil {
+		if err := client.ScanFileContent(cfg.OutputJSON, cfg.OutputCSV); err != nil {
 			return err
 		}
 	}

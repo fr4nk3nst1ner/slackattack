@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -76,7 +78,7 @@ func (c *Client) ListChannels(outputJSON string) error {
 }
 
 // ListUsers lists all workspace users
-func (c *Client) ListUsers(outputJSON string) error {
+func (c *Client) ListUsers(outputJSON, outputCSV string) error {
 	var users []interface{}
 	cursor := ""
 
@@ -122,24 +124,19 @@ func (c *Client) ListUsers(outputJSON string) error {
 		}
 	}
 
-	if outputJSON != "" {
-		return writeJSON(outputJSON, userList)
-	}
-
-	// Print to stdout
-	fmt.Println("\nList of Users:")
-	for _, user := range userList {
-		fmt.Printf("\nUser Details:\n")
-		for key, value := range user {
-			fmt.Printf("  %s: %s\n", key, value)
+	return writeOutput(outputJSON, outputCSV, userList, func() {
+		fmt.Println("\nList of Users:")
+		for _, user := range userList {
+			fmt.Printf("\nUser Details:\n")
+			for key, value := range user {
+				fmt.Printf("  %s: %s\n", key, value)
+			}
 		}
-	}
-
-	return nil
+	})
 }
 
 // FindExternalChannels returns channels shared with external organizations or workspaces
-func (c *Client) FindExternalChannels(outputJSON string) error {
+func (c *Client) FindExternalChannels(outputJSON, outputCSV string) error {
 	cursor := ""
 	var results []map[string]string
 
@@ -180,22 +177,19 @@ func (c *Client) FindExternalChannels(outputJSON string) error {
 		cursor = next
 	}
 
-	if outputJSON != "" {
-		return writeJSON(outputJSON, results)
-	}
-
-	fmt.Println("\nExternal / Shared Channels:")
-	for _, ch := range results {
-		fmt.Printf("\nChannel Details:\n")
-		for k, v := range ch {
-			fmt.Printf("  %s: %s\n", k, v)
+	return writeOutput(outputJSON, outputCSV, results, func() {
+		fmt.Println("\nExternal / Shared Channels:")
+		for _, ch := range results {
+			fmt.Printf("\nChannel Details:\n")
+			for k, v := range ch {
+				fmt.Printf("  %s: %s\n", k, v)
+			}
 		}
-	}
-	return nil
+	})
 }
 
 // ListFiles lists all accessible files
-func (c *Client) ListFiles(outputJSON string) error {
+func (c *Client) ListFiles(outputJSON, outputCSV string) error {
 	result, err := c.makeRequest("https://slack.com/api/files.list", "POST", "")
 	if err != nil {
 		return fmt.Errorf("failed to list files: %v", err)
@@ -222,20 +216,15 @@ func (c *Client) ListFiles(outputJSON string) error {
 		}
 	}
 
-	if outputJSON != "" {
-		return writeJSON(outputJSON, fileList)
-	}
-
-	// Print to stdout
-	fmt.Println("\nList of Files:")
-	for _, file := range fileList {
-		fmt.Printf("\nFile Details:\n")
-		for key, value := range file {
-			fmt.Printf("  %s: %s\n", key, value)
+	return writeOutput(outputJSON, outputCSV, fileList, func() {
+		fmt.Println("\nList of Files:")
+		for _, file := range fileList {
+			fmt.Printf("\nFile Details:\n")
+			for key, value := range file {
+				fmt.Printf("  %s: %s\n", key, value)
+			}
 		}
-	}
-
-	return nil
+	})
 }
 
 // Pillage searches for secrets in the specified channel
@@ -311,7 +300,7 @@ var binaryMimeTypes = []string{
 }
 
 // ScanFileContent downloads accessible text files and scans them for secret patterns
-func (c *Client) ScanFileContent(outputJSON string) error {
+func (c *Client) ScanFileContent(outputJSON, outputCSV string) error {
 	result, err := c.makeRequest("https://slack.com/api/files.list", "POST", "")
 	if err != nil {
 		return fmt.Errorf("failed to list files: %v", err)
@@ -359,18 +348,15 @@ func (c *Client) ScanFileContent(outputJSON string) error {
 	nextFile:
 	}
 
-	if outputJSON != "" {
-		return writeJSON(outputJSON, findings)
-	}
-
-	fmt.Println("\nFile Content Scan Findings:")
-	for _, f := range findings {
-		fmt.Printf("\nFinding:\n")
-		for k, v := range f {
-			fmt.Printf("  %s: %s\n", k, v)
+	return writeOutput(outputJSON, outputCSV, findings, func() {
+		fmt.Println("\nFile Content Scan Findings:")
+		for _, f := range findings {
+			fmt.Printf("\nFinding:\n")
+			for k, v := range f {
+				fmt.Printf("  %s: %s\n", k, v)
+			}
 		}
-	}
-	return nil
+	})
 }
 
 // fetchFileContent downloads a private Slack file and returns its content as a string
@@ -395,7 +381,7 @@ func (c *Client) fetchFileContent(url string) (string, error) {
 }
 
 // FindHighValueTargets returns workspace admins and owners — accounts with elevated privileges
-func (c *Client) FindHighValueTargets(outputJSON string) error {
+func (c *Client) FindHighValueTargets(outputJSON, outputCSV string) error {
 	var users []interface{}
 	cursor := ""
 
@@ -440,22 +426,19 @@ func (c *Client) FindHighValueTargets(outputJSON string) error {
 		})
 	}
 
-	if outputJSON != "" {
-		return writeJSON(outputJSON, targets)
-	}
-
-	fmt.Println("\nHigh-Value Targets (Admins / Owners):")
-	for _, t := range targets {
-		fmt.Printf("\nUser:\n")
-		for k, v := range t {
-			fmt.Printf("  %s: %s\n", k, v)
+	return writeOutput(outputJSON, outputCSV, targets, func() {
+		fmt.Println("\nHigh-Value Targets (Admins / Owners):")
+		for _, t := range targets {
+			fmt.Printf("\nUser:\n")
+			for k, v := range t {
+				fmt.Printf("  %s: %s\n", k, v)
+			}
 		}
-	}
-	return nil
+	})
 }
 
 // FindWebhooks scans channel topics and purposes for Slack incoming webhook URLs
-func (c *Client) FindWebhooks(outputJSON string) error {
+func (c *Client) FindWebhooks(outputJSON, outputCSV string) error {
 	cursor := ""
 	var results []map[string]string
 
@@ -504,22 +487,19 @@ func (c *Client) FindWebhooks(outputJSON string) error {
 		cursor = next
 	}
 
-	if outputJSON != "" {
-		return writeJSON(outputJSON, results)
-	}
-
-	fmt.Println("\nWebhooks Found:")
-	for _, wh := range results {
-		fmt.Printf("\nWebhook:\n")
-		for k, v := range wh {
-			fmt.Printf("  %s: %s\n", k, v)
+	return writeOutput(outputJSON, outputCSV, results, func() {
+		fmt.Println("\nWebhooks Found:")
+		for _, wh := range results {
+			fmt.Printf("\nWebhook:\n")
+			for k, v := range wh {
+				fmt.Printf("  %s: %s\n", k, v)
+			}
 		}
-	}
-	return nil
+	})
 }
 
 // AuditTokenScopes calls auth.test and reports the token identity and OAuth scopes
-func (c *Client) AuditTokenScopes(outputJSON string) error {
+func (c *Client) AuditTokenScopes(outputJSON, outputCSV string) error {
 	result, err := c.makeRequest("https://slack.com/api/auth.test", "POST", "")
 	if err != nil {
 		return fmt.Errorf("failed to call auth.test: %v", err)
@@ -535,19 +515,16 @@ func (c *Client) AuditTokenScopes(outputJSON string) error {
 		"Scopes":     getString(result, "scopes"),
 	}
 
-	if outputJSON != "" {
-		return writeJSON(outputJSON, report)
-	}
-
-	fmt.Println("\nToken Scope Audit:")
-	for k, v := range report {
-		fmt.Printf("  %s: %s\n", k, v)
-	}
-	return nil
+	return writeOutput(outputJSON, outputCSV, []map[string]string{report}, func() {
+		fmt.Println("\nToken Scope Audit:")
+		for k, v := range report {
+			fmt.Printf("  %s: %s\n", k, v)
+		}
+	})
 }
 
 // ScanPins retrieves pinned items from all accessible channels and returns their content
-func (c *Client) ScanPins(outputJSON string) error {
+func (c *Client) ScanPins(outputJSON, outputCSV string) error {
 	// Fetch all accessible channels
 	result, err := c.makeRequest("https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200", "POST", "")
 	if err != nil {
@@ -596,18 +573,15 @@ func (c *Client) ScanPins(outputJSON string) error {
 		}
 	}
 
-	if outputJSON != "" {
-		return writeJSON(outputJSON, pins)
-	}
-
-	fmt.Println("\nPinned Items:")
-	for _, pin := range pins {
-		fmt.Printf("\nPin:\n")
-		for k, v := range pin {
-			fmt.Printf("  %s: %s\n", k, v)
+	return writeOutput(outputJSON, outputCSV, pins, func() {
+		fmt.Println("\nPinned Items:")
+		for _, pin := range pins {
+			fmt.Printf("\nPin:\n")
+			for k, v := range pin {
+				fmt.Printf("  %s: %s\n", k, v)
+			}
 		}
-	}
-	return nil
+	})
 }
 
 // DownloadFiles downloads all accessible files
@@ -683,6 +657,71 @@ func formatBool(b bool) string {
 
 func formatTimestamp(ts int64) string {
 	return time.Unix(ts, 0).Format("2006-01-02 15:04:05")
+}
+
+// writeOutput writes data to JSON and/or CSV files; falls back to printFn when neither is set.
+func writeOutput(outputJSON, outputCSV string, data []map[string]string, printFn func()) error {
+	wrote := false
+	if outputJSON != "" {
+		if err := writeJSON(outputJSON, data); err != nil {
+			return err
+		}
+		wrote = true
+	}
+	if outputCSV != "" {
+		if err := writeCSV(outputCSV, data); err != nil {
+			return err
+		}
+		wrote = true
+	}
+	if !wrote {
+		printFn()
+	}
+	return nil
+}
+
+// writeCSV writes a slice of map[string]string records to a CSV file.
+// Column order is derived from the first record's keys (sorted for determinism).
+func writeCSV(filename string, data []map[string]string) error {
+	dir := filepath.Dir(filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	f, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create CSV file: %v", err)
+	}
+	defer f.Close()
+
+	w := csv.NewWriter(f)
+	defer w.Flush()
+
+	if len(data) == 0 {
+		return nil
+	}
+
+	// Determine column order from the first record
+	headers := make([]string, 0, len(data[0]))
+	for k := range data[0] {
+		headers = append(headers, k)
+	}
+	sort.Strings(headers)
+
+	if err := w.Write(headers); err != nil {
+		return err
+	}
+
+	for _, record := range data {
+		row := make([]string, len(headers))
+		for i, h := range headers {
+			row[i] = record[h]
+		}
+		if err := w.Write(row); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeJSON(filename string, data interface{}) error {
