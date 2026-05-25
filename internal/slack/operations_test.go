@@ -885,3 +885,129 @@ func TestFindHighValueTargetsAPIError(t *testing.T) {
 		t.Fatal("expected error for not_authed, got nil")
 	}
 }
+
+// --- D7: ScanFileContent ---
+
+func makeFileEntry(name, mimetype, urlPath string) map[string]interface{} {
+	return map[string]interface{}{
+		"id":          "F001",
+		"name":        name,
+		"mimetype":    mimetype,
+		"url_private": urlPath,
+	}
+}
+
+func TestScanFileContentFindsSecrets(t *testing.T) {
+	const secretContent = "aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\npassword: hunter2"
+
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "files.list") {
+			respondJSON(w, map[string]interface{}{
+				"ok": true,
+				"files": []interface{}{
+					map[string]interface{}{
+						"id": "F001", "name": "config.txt",
+						"mimetype":    "text/plain",
+						"url_private": srvURL + "/files/config.txt",
+					},
+				},
+			})
+			return
+		}
+		fmt.Fprint(w, secretContent)
+	}))
+	defer srv.Close()
+	srvURL = srv.URL
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "scan.json")
+	if err := c.ScanFileContent(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) == 0 {
+		t.Fatal("expected at least one finding, got 0")
+	}
+}
+
+func TestScanFileContentSkipsBinary(t *testing.T) {
+	var fileDownloaded bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "files.list") {
+			respondJSON(w, map[string]interface{}{
+				"ok": true,
+				"files": []interface{}{
+					makeFileEntry("photo.png", "image/png", "/files/photo.png"),
+				},
+			})
+			return
+		}
+		fileDownloaded = true
+		fmt.Fprint(w, "binary content")
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	c.baseURL = srv.URL
+
+	outFile := filepath.Join(t.TempDir(), "scan.json")
+	if err := c.ScanFileContent(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fileDownloaded {
+		t.Error("binary file should have been skipped, not downloaded")
+	}
+}
+
+func TestScanFileContentNoFindings(t *testing.T) {
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "files.list") {
+			respondJSON(w, map[string]interface{}{
+				"ok": true,
+				"files": []interface{}{
+					map[string]interface{}{
+						"id": "F002", "name": "notes.txt",
+						"mimetype":    "text/plain",
+						"url_private": srvURL + "/files/notes.txt",
+					},
+				},
+			})
+			return
+		}
+		fmt.Fprint(w, "nothing sensitive here")
+	}))
+	defer srv.Close()
+	srvURL = srv.URL
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "scan.json")
+	if err := c.ScanFileContent(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 0 {
+		t.Errorf("expected 0 findings, got %d", len(out))
+	}
+}
+
+func TestScanFileContentAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.ScanFileContent(""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}

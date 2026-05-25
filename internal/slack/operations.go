@@ -3,9 +3,12 @@ package slack
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/fr4nk3nst1ner/slackattack/internal/models"
@@ -289,6 +292,107 @@ func (c *Client) Pillage(channelName string, outputJSON string) error {
 }
 
 var webhookRe = regexp.MustCompile(`https://hooks\.slack\.com/\S+`)
+
+// secretPatterns maps pattern names to regexes used during file content scanning
+var secretPatterns = map[string]*regexp.Regexp{
+	"AWS Access Key":       regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
+	"AWS Secret Key":       regexp.MustCompile(`(?i)aws_secret_access_key\s*=\s*\S+`),
+	"Slack Token":          regexp.MustCompile(`xox[bpao]-[0-9A-Za-z-]+`),
+	"Private Key Header":   regexp.MustCompile(`-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----`),
+	"Generic Password":     regexp.MustCompile(`(?i)password\s*[:=]\s*\S+`),
+	"Generic API Key":      regexp.MustCompile(`(?i)api[_-]?key\s*[:=]\s*\S+`),
+	"GitHub Token":         regexp.MustCompile(`ghp_[A-Za-z0-9]{36}`),
+}
+
+// binaryMimeTypes contains MIME prefixes that indicate non-text content to skip
+var binaryMimeTypes = []string{
+	"image/", "video/", "audio/", "application/pdf",
+	"application/zip", "application/octet-stream",
+}
+
+// ScanFileContent downloads accessible text files and scans them for secret patterns
+func (c *Client) ScanFileContent(outputJSON string) error {
+	result, err := c.makeRequest("https://slack.com/api/files.list", "POST", "")
+	if err != nil {
+		return fmt.Errorf("failed to list files: %v", err)
+	}
+
+	files, _ := result["files"].([]interface{})
+	var findings []map[string]string
+
+	for _, f := range files {
+		fileMap, ok := f.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		mimetype := getString(fileMap, "mimetype")
+		for _, prefix := range binaryMimeTypes {
+			if strings.HasPrefix(mimetype, prefix) {
+				goto nextFile
+			}
+		}
+
+		{
+			url := getString(fileMap, "url_private")
+			name := getString(fileMap, "name")
+			if url == "" {
+				continue
+			}
+
+			content, err := c.fetchFileContent(url)
+			if err != nil {
+				continue
+			}
+
+			for patternName, re := range secretPatterns {
+				matches := re.FindAllString(content, -1)
+				for _, match := range matches {
+					findings = append(findings, map[string]string{
+						"File Name": name,
+						"File URL":  url,
+						"Pattern":   patternName,
+						"Match":     match,
+					})
+				}
+			}
+		}
+	nextFile:
+	}
+
+	if outputJSON != "" {
+		return writeJSON(outputJSON, findings)
+	}
+
+	fmt.Println("\nFile Content Scan Findings:")
+	for _, f := range findings {
+		fmt.Printf("\nFinding:\n")
+		for k, v := range f {
+			fmt.Printf("  %s: %s\n", k, v)
+		}
+	}
+	return nil
+}
+
+// fetchFileContent downloads a private Slack file and returns its content as a string
+func (c *Client) fetchFileContent(url string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.credentials.Token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB limit
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
 
 // FindHighValueTargets returns workspace admins and owners — accounts with elevated privileges
 func (c *Client) FindHighValueTargets(outputJSON string) error {
