@@ -19,18 +19,19 @@ type Config struct {
 	ProxyURL     string
 
 	// Actions
-	ListChannels       bool
-	ListUsers         bool
-	ListFiles         bool
-	DownloadFiles     bool
-	Pillage           string
-	DumpChannel       string
-	ListDMs           bool
-	DumpDM            string
-	ChannelMembership bool
-	CheckPermissions  bool
-	DumpLogs         bool
-	Test             bool
+	ListChannels        bool
+	ListUsers           bool
+	ListFiles           bool
+	DownloadFiles       bool
+	Pillage             string
+	DumpChannel         string
+	ListDMs             bool
+	DumpDM              string
+	ChannelMembership   bool
+	CheckPermissions    bool
+	DumpLogs            bool
+	Test                bool
+	FindExternalChannels bool
 
 	// Output options
 	OutputJSON   string
@@ -92,6 +93,7 @@ func parseFlags() *Config {
 	flag.BoolVar(&cfg.CheckPermissions, "check-permissions", false, "Check API token permissions")
 	flag.BoolVar(&cfg.DumpLogs, "dump-logs", false, "Dump team access logs")
 	flag.BoolVar(&cfg.Test, "test", false, "Test Slack credentials")
+	flag.BoolVar(&cfg.FindExternalChannels, "find-external-channels", false, "Find channels shared with external orgs")
 
 	// Output flags
 	flag.StringVar(&cfg.OutputJSON, "output-json", "", "Save output in JSON format to the specified file")
@@ -128,7 +130,8 @@ func parseFlags() *Config {
 func (c *Config) hasAction() bool {
 	return c.ListChannels || c.ListUsers || c.ListFiles || c.DownloadFiles ||
 		c.Pillage != "" || c.DumpChannel != "" || c.ListDMs || c.DumpDM != "" ||
-		c.ChannelMembership || c.CheckPermissions || c.DumpLogs || c.Test
+		c.ChannelMembership || c.CheckPermissions || c.DumpLogs || c.Test ||
+		c.FindExternalChannels
 }
 
 func executeActions(client *slack.Client, cfg *Config) error {
@@ -204,6 +207,12 @@ func executeActions(client *slack.Client, cfg *Config) error {
 
 	if cfg.DumpLogs {
 		if err := client.DumpTeamAccessLogs(cfg.OutputJSON); err != nil {
+			return err
+		}
+	}
+
+	if cfg.FindExternalChannels {
+		if err := client.FindExternalChannels(cfg.OutputJSON); err != nil {
 			return err
 		}
 	}

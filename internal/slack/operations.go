@@ -134,6 +134,62 @@ func (c *Client) ListUsers(outputJSON string) error {
 	return nil
 }
 
+// FindExternalChannels returns channels shared with external organizations or workspaces
+func (c *Client) FindExternalChannels(outputJSON string) error {
+	cursor := ""
+	var results []map[string]string
+
+	for {
+		endpoint := "https://slack.com/api/conversations.list?types=public_channel,private_channel,mpim,im&limit=200"
+		if cursor != "" {
+			endpoint += "&cursor=" + cursor
+		}
+		result, err := c.makeRequest(endpoint, "POST", "")
+		if err != nil {
+			return fmt.Errorf("failed to list channels: %v", err)
+		}
+
+		channels, _ := result["channels"].([]interface{})
+		for _, ch := range channels {
+			chMap, ok := ch.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			isShared := getBool(chMap, "is_shared")
+			isExtShared := getBool(chMap, "is_ext_shared")
+			if isShared || isExtShared {
+				results = append(results, map[string]string{
+					"Channel ID":    getString(chMap, "id"),
+					"Name":          getString(chMap, "name"),
+					"Is Shared":     formatBool(isShared),
+					"Is Ext Shared": formatBool(isExtShared),
+					"Member Count":  fmt.Sprintf("%d", getInt(chMap, "num_members")),
+				})
+			}
+		}
+
+		meta, _ := result["response_metadata"].(map[string]interface{})
+		next, _ := meta["next_cursor"].(string)
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+
+	if outputJSON != "" {
+		return writeJSON(outputJSON, results)
+	}
+
+	fmt.Println("\nExternal / Shared Channels:")
+	for _, ch := range results {
+		fmt.Printf("\nChannel Details:\n")
+		for k, v := range ch {
+			fmt.Printf("  %s: %s\n", k, v)
+		}
+	}
+	return nil
+}
+
 // ListFiles lists all accessible files
 func (c *Client) ListFiles(outputJSON string) error {
 	result, err := c.makeRequest("https://slack.com/api/files.list", "POST", "")

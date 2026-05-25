@@ -340,3 +340,125 @@ func TestRateLimitFallbackBackoff(t *testing.T) {
 		t.Error("expected at least 2 requests")
 	}
 }
+
+// --- D2: FindExternalChannels ---
+
+func makeChannel(id, name string, isShared, isExtShared bool) map[string]interface{} {
+	return map[string]interface{}{
+		"id":            id,
+		"name":          name,
+		"is_shared":     isShared,
+		"is_ext_shared": isExtShared,
+		"num_members":   float64(5),
+	}
+}
+
+func channelsResponse(channels []map[string]interface{}, nextCursor string) map[string]interface{} {
+	list := make([]interface{}, len(channels))
+	for i, c := range channels {
+		list[i] = c
+	}
+	return map[string]interface{}{
+		"ok":       true,
+		"channels": list,
+		"response_metadata": map[string]interface{}{
+			"next_cursor": nextCursor,
+		},
+	}
+}
+
+func TestFindExternalChannelsNone(t *testing.T) {
+	channels := []map[string]interface{}{
+		makeChannel("C1", "general", false, false),
+		makeChannel("C2", "random", false, false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "external.json")
+	if err := c.FindExternalChannels(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("expected 0 external channels, got %d", len(out))
+	}
+}
+
+func TestFindExternalChannelsSome(t *testing.T) {
+	channels := []map[string]interface{}{
+		makeChannel("C1", "internal", false, false),
+		makeChannel("C2", "shared-ext", true, true),
+		makeChannel("C3", "org-shared", true, false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "external.json")
+	if err := c.FindExternalChannels(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 2 {
+		t.Errorf("expected 2 external channels, got %d", len(out))
+	}
+	for _, ch := range out {
+		if ch["Channel ID"] == "C1" {
+			t.Error("internal channel should not be in results")
+		}
+	}
+}
+
+func TestFindExternalChannelsExtSharedOnly(t *testing.T) {
+	channels := []map[string]interface{}{
+		makeChannel("C1", "ext-only", false, true),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, channelsResponse(channels, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "external.json")
+	if err := c.FindExternalChannels(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 1 {
+		t.Errorf("expected 1 channel with is_ext_shared=true, got %d", len(out))
+	}
+	if out[0]["Is Ext Shared"] != "Yes" {
+		t.Errorf("expected Is Ext Shared=Yes, got %q", out[0]["Is Ext Shared"])
+	}
+}
+
+func TestFindExternalChannelsAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.FindExternalChannels(""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}
