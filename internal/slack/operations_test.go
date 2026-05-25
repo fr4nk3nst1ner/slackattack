@@ -287,3 +287,56 @@ func TestListUsersJSONOutput(t *testing.T) {
 		t.Errorf("expected email test@example.com, got %q", user["Email"])
 	}
 }
+
+// --- TestRateLimitWithRetryAfter ---
+
+func TestRateLimitWithRetryAfter(t *testing.T) {
+	var requestCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&requestCount, 1)
+		if n == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			respondJSON(w, map[string]interface{}{"ok": false, "error": "ratelimited"})
+			return
+		}
+		respondJSON(w, membersResponse([]map[string]interface{}{
+			makeMember("U1", "alice", "alice@example.com", false),
+		}, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+	if err := c.ListUsers(outFile); err != nil {
+		t.Fatalf("expected success after retry, got: %v", err)
+	}
+	if atomic.LoadInt32(&requestCount) < 2 {
+		t.Error("expected at least 2 requests (rate limited + retry)")
+	}
+}
+
+func TestRateLimitFallbackBackoff(t *testing.T) {
+	var requestCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&requestCount, 1)
+		if n == 1 {
+			// Rate limited with no Retry-After header
+			respondJSON(w, map[string]interface{}{"ok": false, "error": "ratelimited"})
+			return
+		}
+		respondJSON(w, membersResponse([]map[string]interface{}{
+			makeMember("U1", "alice", "alice@example.com", false),
+		}, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "users.json")
+	if err := c.ListUsers(outFile); err != nil {
+		t.Fatalf("expected success after backoff retry, got: %v", err)
+	}
+	if atomic.LoadInt32(&requestCount) < 2 {
+		t.Error("expected at least 2 requests")
+	}
+}
