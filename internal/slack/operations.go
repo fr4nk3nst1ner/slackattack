@@ -287,6 +287,34 @@ func (c *Client) Pillage(channelName string, outputJSON string) error {
 	return nil
 }
 
+// AuditTokenScopes calls auth.test and reports the token identity and OAuth scopes
+func (c *Client) AuditTokenScopes(outputJSON string) error {
+	result, err := c.makeRequest("https://slack.com/api/auth.test", "POST", "")
+	if err != nil {
+		return fmt.Errorf("failed to call auth.test: %v", err)
+	}
+
+	report := map[string]string{
+		"User ID":    getString(result, "user_id"),
+		"Username":   getString(result, "user"),
+		"Team":       getString(result, "team"),
+		"Team ID":    getString(result, "team_id"),
+		"Bot ID":     getString(result, "bot_id"),
+		"Token Type": getString(result, "token_type"),
+		"Scopes":     getString(result, "scopes"),
+	}
+
+	if outputJSON != "" {
+		return writeJSON(outputJSON, report)
+	}
+
+	fmt.Println("\nToken Scope Audit:")
+	for k, v := range report {
+		fmt.Printf("  %s: %s\n", k, v)
+	}
+	return nil
+}
+
 // ScanPins retrieves pinned items from all accessible channels and returns their content
 func (c *Client) ScanPins(outputJSON string) error {
 	// Fetch all accessible channels

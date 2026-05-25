@@ -588,3 +588,83 @@ func TestScanPinsAPIError(t *testing.T) {
 		t.Fatal("expected error for not_authed, got nil")
 	}
 }
+
+// --- D4: AuditTokenScopes ---
+
+func TestAuditTokenScopesSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{
+			"ok":         true,
+			"user_id":    "U123",
+			"user":       "testbot",
+			"team":       "My Team",
+			"team_id":    "T456",
+			"bot_id":     "B789",
+			"token_type": "bot",
+			"scopes":     "channels:read,users:read,files:read",
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "audit.json")
+	if err := c.AuditTokenScopes(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if out["User ID"] != "U123" {
+		t.Errorf("expected User ID=U123, got %q", out["User ID"])
+	}
+	if out["Token Type"] != "bot" {
+		t.Errorf("expected Token Type=bot, got %q", out["Token Type"])
+	}
+	if out["Scopes"] != "channels:read,users:read,files:read" {
+		t.Errorf("unexpected scopes: %q", out["Scopes"])
+	}
+}
+
+func TestAuditTokenScopesRequiredFields(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{
+			"ok":      true,
+			"user_id": "UABC",
+			"user":    "alice",
+			"team":    "ACME",
+			"team_id": "TACME",
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "audit.json")
+	if err := c.AuditTokenScopes(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out map[string]string
+	_ = json.Unmarshal(data, &out)
+
+	for _, k := range []string{"User ID", "Username", "Team", "Team ID", "Bot ID", "Token Type", "Scopes"} {
+		if _, ok := out[k]; !ok {
+			t.Errorf("output missing required key %q", k)
+		}
+	}
+}
+
+func TestAuditTokenScopesAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "invalid_auth"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.AuditTokenScopes(""); err == nil {
+		t.Fatal("expected error for invalid_auth, got nil")
+	}
+}

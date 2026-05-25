@@ -33,6 +33,7 @@ type Config struct {
 	Test                bool
 	FindExternalChannels bool
 	ScanPins             bool
+	AuditTokenScopes     bool
 
 	// Output options
 	OutputJSON   string
@@ -96,6 +97,7 @@ func parseFlags() *Config {
 	flag.BoolVar(&cfg.Test, "test", false, "Test Slack credentials")
 	flag.BoolVar(&cfg.FindExternalChannels, "find-external-channels", false, "Find channels shared with external orgs")
 	flag.BoolVar(&cfg.ScanPins, "scan-pins", false, "Scan pinned messages across all accessible channels")
+	flag.BoolVar(&cfg.AuditTokenScopes, "audit-token", false, "Audit token identity and OAuth scopes via auth.test")
 
 	// Output flags
 	flag.StringVar(&cfg.OutputJSON, "output-json", "", "Save output in JSON format to the specified file")
@@ -133,7 +135,7 @@ func (c *Config) hasAction() bool {
 	return c.ListChannels || c.ListUsers || c.ListFiles || c.DownloadFiles ||
 		c.Pillage != "" || c.DumpChannel != "" || c.ListDMs || c.DumpDM != "" ||
 		c.ChannelMembership || c.CheckPermissions || c.DumpLogs || c.Test ||
-		c.FindExternalChannels || c.ScanPins
+		c.FindExternalChannels || c.ScanPins || c.AuditTokenScopes
 }
 
 func executeActions(client *slack.Client, cfg *Config) error {
@@ -221,6 +223,12 @@ func executeActions(client *slack.Client, cfg *Config) error {
 
 	if cfg.ScanPins {
 		if err := client.ScanPins(cfg.OutputJSON); err != nil {
+			return err
+		}
+	}
+
+	if cfg.AuditTokenScopes {
+		if err := client.AuditTokenScopes(cfg.OutputJSON); err != nil {
 			return err
 		}
 	}
