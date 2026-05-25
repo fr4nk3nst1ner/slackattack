@@ -73,14 +73,30 @@ func (c *Client) ListChannels(outputJSON string) error {
 
 // ListUsers lists all workspace users
 func (c *Client) ListUsers(outputJSON string) error {
-	result, err := c.makeRequest("https://slack.com/api/users.list", "POST", "")
-	if err != nil {
-		return fmt.Errorf("failed to list users: %v", err)
-	}
+	var users []interface{}
+	cursor := ""
 
-	users, ok := result["members"].([]interface{})
-	if !ok {
-		return fmt.Errorf("no users found in response")
+	for {
+		endpoint := "https://slack.com/api/users.list?limit=200"
+		if cursor != "" {
+			endpoint += "&cursor=" + cursor
+		}
+		result, err := c.makeRequest(endpoint, "POST", "")
+		if err != nil {
+			return fmt.Errorf("failed to list users: %v", err)
+		}
+		members, ok := result["members"].([]interface{})
+		if !ok {
+			return fmt.Errorf("no users found in response")
+		}
+		users = append(users, members...)
+
+		meta, _ := result["response_metadata"].(map[string]interface{})
+		next, _ := meta["next_cursor"].(string)
+		if next == "" {
+			break
+		}
+		cursor = next
 	}
 
 	var userList []map[string]string
