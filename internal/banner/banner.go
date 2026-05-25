@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const version = "1.0.2"
+const version = "1.0.3"
 
 // RGB represents a color in RGB format
 type RGB struct {
