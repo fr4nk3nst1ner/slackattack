@@ -462,3 +462,129 @@ func TestFindExternalChannelsAPIError(t *testing.T) {
 		t.Fatal("expected error for not_authed, got nil")
 	}
 }
+
+// --- D3: ScanPins ---
+
+func TestScanPinsNoChannels(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "conversations.list") {
+			respondJSON(w, channelsResponse(nil, ""))
+		} else {
+			respondJSON(w, map[string]interface{}{"ok": true, "items": []interface{}{}})
+		}
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "pins.json")
+	if err := c.ScanPins(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 0 {
+		t.Errorf("expected 0 pins, got %d", len(out))
+	}
+}
+
+func TestScanPinsWithMessage(t *testing.T) {
+	channel := makeChannel("C1", "general", false, false)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "conversations.list") {
+			respondJSON(w, channelsResponse([]map[string]interface{}{channel}, ""))
+			return
+		}
+		// pins.list
+		respondJSON(w, map[string]interface{}{
+			"ok": true,
+			"items": []interface{}{
+				map[string]interface{}{
+					"type":    "message",
+					"created": float64(1700000000),
+					"message": map[string]interface{}{
+						"text": "super secret: password123",
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "pins.json")
+	if err := c.ScanPins(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 pin, got %d", len(out))
+	}
+	if out[0]["Type"] != "message" {
+		t.Errorf("expected type=message, got %q", out[0]["Type"])
+	}
+	if !strings.Contains(out[0]["Content"], "password123") {
+		t.Errorf("expected pin content to contain password123, got %q", out[0]["Content"])
+	}
+}
+
+func TestScanPinsWithFile(t *testing.T) {
+	channel := makeChannel("C2", "secrets", false, false)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "conversations.list") {
+			respondJSON(w, channelsResponse([]map[string]interface{}{channel}, ""))
+			return
+		}
+		respondJSON(w, map[string]interface{}{
+			"ok": true,
+			"items": []interface{}{
+				map[string]interface{}{
+					"type":    "file",
+					"created": float64(1700000001),
+					"file": map[string]interface{}{
+						"name":        "creds.txt",
+						"url_private": "https://files.slack.com/creds.txt",
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "pins.json")
+	if err := c.ScanPins(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 pin, got %d", len(out))
+	}
+	if out[0]["Type"] != "file" {
+		t.Errorf("expected type=file, got %q", out[0]["Type"])
+	}
+	if !strings.Contains(out[0]["Content"], "creds.txt") {
+		t.Errorf("expected content to contain filename, got %q", out[0]["Content"])
+	}
+}
+
+func TestScanPinsAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.ScanPins(""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}

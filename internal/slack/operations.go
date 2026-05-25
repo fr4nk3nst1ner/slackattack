@@ -287,6 +287,70 @@ func (c *Client) Pillage(channelName string, outputJSON string) error {
 	return nil
 }
 
+// ScanPins retrieves pinned items from all accessible channels and returns their content
+func (c *Client) ScanPins(outputJSON string) error {
+	// Fetch all accessible channels
+	result, err := c.makeRequest("https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200", "POST", "")
+	if err != nil {
+		return fmt.Errorf("failed to list channels: %v", err)
+	}
+	channels, _ := result["channels"].([]interface{})
+
+	var pins []map[string]string
+	for _, ch := range channels {
+		chMap, ok := ch.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		channelID := getString(chMap, "id")
+		channelName := getString(chMap, "name")
+
+		pr, err := c.makeRequest("https://slack.com/api/pins.list?channel="+channelID, "GET", "")
+		if err != nil {
+			continue
+		}
+		items, _ := pr["items"].([]interface{})
+		for _, item := range items {
+			itemMap, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			pinType := getString(itemMap, "type")
+			content := ""
+			switch pinType {
+			case "message":
+				if msg, ok := itemMap["message"].(map[string]interface{}); ok {
+					content = getString(msg, "text")
+				}
+			case "file":
+				if f, ok := itemMap["file"].(map[string]interface{}); ok {
+					content = getString(f, "name") + ": " + getString(f, "url_private")
+				}
+			}
+			pins = append(pins, map[string]string{
+				"Channel ID":   channelID,
+				"Channel Name": channelName,
+				"Type":         pinType,
+				"Content":      content,
+				"Created":      formatTimestamp(getInt64(itemMap, "created")),
+			})
+		}
+	}
+
+	if outputJSON != "" {
+		return writeJSON(outputJSON, pins)
+	}
+
+	fmt.Println("\nPinned Items:")
+	for _, pin := range pins {
+		fmt.Printf("\nPin:\n")
+		for k, v := range pin {
+			fmt.Printf("  %s: %s\n", k, v)
+		}
+	}
+	return nil
+}
+
 // DownloadFiles downloads all accessible files
 func (c *Client) DownloadFiles(outputDir string) error {
 	if outputDir == "" {
