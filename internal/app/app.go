@@ -35,6 +35,7 @@ type Config struct {
 	ScanPins             bool
 	AuditTokenScopes     bool
 	FindWebhooks         bool
+	FindHighValueTargets bool
 
 	// Output options
 	OutputJSON   string
@@ -100,6 +101,7 @@ func parseFlags() *Config {
 	flag.BoolVar(&cfg.ScanPins, "scan-pins", false, "Scan pinned messages across all accessible channels")
 	flag.BoolVar(&cfg.AuditTokenScopes, "audit-token", false, "Audit token identity and OAuth scopes via auth.test")
 	flag.BoolVar(&cfg.FindWebhooks, "find-webhooks", false, "Scan channel topics/purposes for Slack incoming webhook URLs")
+	flag.BoolVar(&cfg.FindHighValueTargets, "find-targets", false, "List workspace admins and owners (high-value targets)")
 
 	// Output flags
 	flag.StringVar(&cfg.OutputJSON, "output-json", "", "Save output in JSON format to the specified file")
@@ -137,7 +139,8 @@ func (c *Config) hasAction() bool {
 	return c.ListChannels || c.ListUsers || c.ListFiles || c.DownloadFiles ||
 		c.Pillage != "" || c.DumpChannel != "" || c.ListDMs || c.DumpDM != "" ||
 		c.ChannelMembership || c.CheckPermissions || c.DumpLogs || c.Test ||
-		c.FindExternalChannels || c.ScanPins || c.AuditTokenScopes || c.FindWebhooks
+		c.FindExternalChannels || c.ScanPins || c.AuditTokenScopes || c.FindWebhooks ||
+		c.FindHighValueTargets
 }
 
 func executeActions(client *slack.Client, cfg *Config) error {
@@ -237,6 +240,12 @@ func executeActions(client *slack.Client, cfg *Config) error {
 
 	if cfg.FindWebhooks {
 		if err := client.FindWebhooks(cfg.OutputJSON); err != nil {
+			return err
+		}
+	}
+
+	if cfg.FindHighValueTargets {
+		if err := client.FindHighValueTargets(cfg.OutputJSON); err != nil {
 			return err
 		}
 	}

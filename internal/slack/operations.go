@@ -290,6 +290,66 @@ func (c *Client) Pillage(channelName string, outputJSON string) error {
 
 var webhookRe = regexp.MustCompile(`https://hooks\.slack\.com/\S+`)
 
+// FindHighValueTargets returns workspace admins and owners — accounts with elevated privileges
+func (c *Client) FindHighValueTargets(outputJSON string) error {
+	var users []interface{}
+	cursor := ""
+
+	for {
+		endpoint := "https://slack.com/api/users.list?limit=200"
+		if cursor != "" {
+			endpoint += "&cursor=" + cursor
+		}
+		result, err := c.makeRequest(endpoint, "POST", "")
+		if err != nil {
+			return fmt.Errorf("failed to list users: %v", err)
+		}
+		members, _ := result["members"].([]interface{})
+		users = append(users, members...)
+
+		meta, _ := result["response_metadata"].(map[string]interface{})
+		next, _ := meta["next_cursor"].(string)
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+
+	var targets []map[string]string
+	for _, u := range users {
+		userMap, ok := u.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if !getBool(userMap, "is_admin") && !getBool(userMap, "is_owner") && !getBool(userMap, "is_primary_owner") {
+			continue
+		}
+		profile, _ := userMap["profile"].(map[string]interface{})
+		targets = append(targets, map[string]string{
+			"User ID":          getString(userMap, "id"),
+			"Username":         getString(userMap, "name"),
+			"Real Name":        getString(userMap, "real_name"),
+			"Email":            getString(profile, "email"),
+			"Is Admin":         formatBool(getBool(userMap, "is_admin")),
+			"Is Owner":         formatBool(getBool(userMap, "is_owner")),
+			"Is Primary Owner": formatBool(getBool(userMap, "is_primary_owner")),
+		})
+	}
+
+	if outputJSON != "" {
+		return writeJSON(outputJSON, targets)
+	}
+
+	fmt.Println("\nHigh-Value Targets (Admins / Owners):")
+	for _, t := range targets {
+		fmt.Printf("\nUser:\n")
+		for k, v := range t {
+			fmt.Printf("  %s: %s\n", k, v)
+		}
+	}
+	return nil
+}
+
 // FindWebhooks scans channel topics and purposes for Slack incoming webhook URLs
 func (c *Client) FindWebhooks(outputJSON string) error {
 	cursor := ""

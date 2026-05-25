@@ -777,3 +777,111 @@ func TestFindWebhooksAPIError(t *testing.T) {
 		t.Fatal("expected error for not_authed, got nil")
 	}
 }
+
+// --- D6: FindHighValueTargets ---
+
+func TestFindHighValueTargetsAdminOnly(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("UADMIN", "admin", "admin@example.com", true),
+		makeMember("UNORM", "normal", "normal@example.com", false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "targets.json")
+	if err := c.FindHighValueTargets(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(out))
+	}
+	if out[0]["User ID"] != "UADMIN" {
+		t.Errorf("expected UADMIN, got %q", out[0]["User ID"])
+	}
+	if out[0]["Is Admin"] != "Yes" {
+		t.Errorf("expected Is Admin=Yes, got %q", out[0]["Is Admin"])
+	}
+}
+
+func TestFindHighValueTargetsOwner(t *testing.T) {
+	owner := map[string]interface{}{
+		"id":               "UOWNER",
+		"name":             "owner",
+		"real_name":        "Owner",
+		"is_admin":         false,
+		"is_owner":         true,
+		"is_primary_owner": true,
+		"profile": map[string]interface{}{
+			"display_name": "owner",
+			"email":        "owner@example.com",
+		},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse([]map[string]interface{}{owner}, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "targets.json")
+	if err := c.FindHighValueTargets(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(out))
+	}
+	if out[0]["Is Owner"] != "Yes" {
+		t.Errorf("expected Is Owner=Yes, got %q", out[0]["Is Owner"])
+	}
+	if out[0]["Is Primary Owner"] != "Yes" {
+		t.Errorf("expected Is Primary Owner=Yes, got %q", out[0]["Is Primary Owner"])
+	}
+}
+
+func TestFindHighValueTargetsNone(t *testing.T) {
+	members := []map[string]interface{}{
+		makeMember("U1", "alice", "alice@example.com", false),
+		makeMember("U2", "bob", "bob@example.com", false),
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, membersResponse(members, ""))
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	outFile := filepath.Join(t.TempDir(), "targets.json")
+	if err := c.FindHighValueTargets(outFile); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(outFile)
+	var out []map[string]string
+	_ = json.Unmarshal(data, &out)
+	if len(out) != 0 {
+		t.Errorf("expected 0 targets, got %d", len(out))
+	}
+}
+
+func TestFindHighValueTargetsAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, map[string]interface{}{"ok": false, "error": "not_authed"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv.URL)
+	if err := c.FindHighValueTargets(""); err == nil {
+		t.Fatal("expected error for not_authed, got nil")
+	}
+}
